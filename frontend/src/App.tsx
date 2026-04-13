@@ -34,6 +34,7 @@ type SyncRunSummary = {
   files_deleted: number;
   error_count: number;
   bytes_transferred: number;
+  average_speed_bytes_per_second: number;
   exit_code: number | null;
   short_log: string;
   report: string;
@@ -132,6 +133,15 @@ function formatDateTime(value: string | null) {
   return new Date(value).toLocaleString("de-DE");
 }
 
+function formatDuration(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
 function describeSchedule(pair: Pick<SyncPairSummary, "schedule_enabled" | "schedule_type" | "schedule_interval_minutes" | "schedule_time" | "schedule_weekday">) {
   if (!pair.schedule_enabled) return "Nur manuell";
   if (pair.schedule_type === "interval") return `Alle ${pair.schedule_interval_minutes} Minuten`;
@@ -198,7 +208,6 @@ export function App() {
   const [passwordResetState, setPasswordResetState] = useState(initialPasswordResetState);
 
   const selectedSyncPair = syncPairs.find((pair) => pair.id === selectedSyncPairId) ?? null;
-  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
   const successfulRuns = recentRuns.filter((run) => run.status === "success").length;
   const totalBytes = recentRuns.reduce((sum, run) => sum + run.bytes_transferred, 0);
   const totalFiles = recentRuns.reduce((sum, run) => sum + run.files_transferred, 0);
@@ -221,7 +230,7 @@ export function App() {
     if (!response.ok) throw new Error(`Sync-Paare laden fehlgeschlagen mit Status ${response.status}`);
     const data = (await response.json()) as SyncPairSummary[];
     setSyncPairs(data);
-    setSelectedSyncPairId((current) => data.some((pair) => pair.id === current) ? current : (data[0]?.id ?? null));
+    setSelectedSyncPairId((current) => data.some((pair) => pair.id === current) ? current : null);
   }
 
   async function loadRecentRuns() {
@@ -507,6 +516,11 @@ export function App() {
     } finally {
       setRunActionId(null);
     }
+  }
+
+  function toggleSyncPair(id: string) {
+    setSelectedRunId(null);
+    setSelectedSyncPairId((current) => current === id ? null : id);
   }
 
   async function handleUpdateSchedule(event: FormEvent<HTMLFormElement>) {
@@ -809,104 +823,111 @@ export function App() {
             <section className="panel dashboard-panel">
               <div className="panel-header"><div><p className="eyebrow">Übersicht</p><h2>Deine Syncs</h2></div></div>
               {dashboardLoading ? <p className="state">Lade Dashboard...</p> : null}
+              {!dashboardLoading && syncPairs.length === 0 ? <p className="state">Noch keine Sync-Paare vorhanden.</p> : null}
               {!dashboardLoading ? (
-                <div className="sync-grid">
-                  {syncPairs.map((pair) => (
-                    <article className={`sync-card ${selectedSyncPairId === pair.id ? "selected" : ""}`} key={pair.id}>
-                      <div className="sync-card-header">
-                        <div>
-                          <h3>{pair.name}</h3>
-                          <p>{describeSchedule(pair)}</p>
-                        </div>
-                        <span className={`badge ${pair.last_status === "success" ? "idle" : pair.last_status === "error" ? "error" : "running"}`}>{pair.last_status}</span>
-                      </div>
-                      <dl className="sync-card-meta">
-                        <div><dt>Quelle</dt><dd>{pair.source_path}</dd></div>
-                        <div><dt>Ziel</dt><dd>{pair.destination_path}</dd></div>
-                        <div><dt>Nächster Lauf</dt><dd>{formatDateTime(pair.next_run_at)}</dd></div>
-                        <div><dt>Letzter Lauf</dt><dd>{formatDateTime(pair.last_run_at)}</dd></div>
-                      </dl>
-                      <div className="action-stack">
-                        <button className="table-button" type="button" onClick={() => setSelectedSyncPairId(pair.id)}>Berichte</button>
-                        <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Läuft..." : "Jetzt starten"}</button>
-                        <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Löschen</button>
-                      </div>
-                    </article>
-                  ))}
+                <div className="sync-list">
+                  {syncPairs.map((pair) => {
+                    const isOpen = selectedSyncPairId === pair.id;
+                    return (
+                      <article className={`sync-row ${isOpen ? "open" : ""}`} key={pair.id}>
+                        <button className="sync-row-summary" type="button" onClick={() => toggleSyncPair(pair.id)}>
+                          <div className="sync-row-main">
+                            <strong>{pair.name}</strong>
+                            <span>{describeSchedule(pair)}</span>
+                          </div>
+                          <div className="sync-row-meta">
+                            <span>{pair.source_path}</span>
+                            <span>{pair.destination_path}</span>
+                            <span>{formatDateTime(pair.last_run_at)}</span>
+                            <span>{formatDateTime(pair.next_run_at)}</span>
+                            <span className={`badge ${pair.status === "running" ? "running" : pair.last_status === "error" ? "error" : "idle"}`}>{pair.status === "running" ? "running" : pair.last_status}</span>
+                          </div>
+                        </button>
+
+                        {isOpen ? (
+                          <div className="sync-row-detail">
+                            <div className="sync-row-toolbar">
+                              <div className="action-stack">
+                                <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Läuft..." : "Jetzt starten"}</button>
+                                <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Löschen</button>
+                              </div>
+                            </div>
+
+                            <div className="sync-expanded-grid">
+                              <section className="subpanel">
+                                <div className="panel-header"><div><p className="eyebrow">Zeitplan</p><h3>{pair.name}</h3></div></div>
+                                <form className="sync-form compact-form" onSubmit={handleUpdateSchedule}>
+                                  <label className="schedule-toggle"><span>Zeitplan aktiv</span><input type="checkbox" checked={scheduleEditState.schedule_enabled} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_enabled: event.target.checked }))} /></label>
+                                  <label><span>Intervall</span><select value={scheduleEditState.schedule_type} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="hourly">Stündlich</option><option value="interval">Alle X Minuten</option></select></label>
+                                  {scheduleEditState.schedule_type === "interval" ? (
+                                    <label><span>Minuten</span><input min={5} step={5} type="number" value={scheduleEditState.schedule_interval_minutes} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_interval_minutes: Number(event.target.value) }))} /></label>
+                                  ) : (
+                                    <label><span>Uhrzeit</span><input type="time" value={scheduleEditState.schedule_time} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_time: event.target.value }))} /></label>
+                                  )}
+                                  {scheduleEditState.schedule_type === "weekly" ? (
+                                    <label><span>Wochentag</span><select value={scheduleEditState.schedule_weekday} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_weekday: Number(event.target.value) }))}>{weekdayOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+                                  ) : null}
+                                  <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Zeitplan speichern"}</button>
+                                </form>
+                              </section>
+
+                              <section className="subpanel subpanel-wide">
+                                <div className="panel-header"><div><p className="eyebrow">Verlauf</p><h3>Übertragungen</h3></div></div>
+                                {runLoading ? <p className="state">Lade letzte Läufe...</p> : null}
+                                {!runLoading && runs.length === 0 ? <p className="state">Bisher wurden für dieses Sync-Paar noch keine Dateien übertragen.</p> : null}
+                                {runs.length > 0 ? (
+                                  <div className="run-table">
+                                    {runs.map((run) => (
+                                      <article className={`run-row ${selectedRunId === run.id ? "selected" : ""}`} key={run.id}>
+                                        <button className="run-row-summary" type="button" onClick={() => setSelectedRunId((current) => current === run.id ? null : run.id)}>
+                                          <span>{formatDateTime(run.started_at)}</span>
+                                          <span>{run.files_transferred}</span>
+                                          <span>{formatBytes(run.bytes_transferred)}</span>
+                                          <span>{formatDuration(run.duration_seconds)}</span>
+                                          <span>{formatBytes(run.average_speed_bytes_per_second)}/s</span>
+                                          <span>{formatDateTime(run.finished_at)}</span>
+                                          <span className={`badge ${run.status}`}>{run.status}</span>
+                                        </button>
+                                        {selectedRunId === run.id ? (
+                                          <div className="run-row-detail">
+                                            <div className="report-summary">
+                                              <article className="report-highlight"><span>Dateien bewegt</span><strong>{run.files_transferred}</strong></article>
+                                              <article className="report-highlight"><span>Transfer-Volumen</span><strong>{formatBytes(run.bytes_transferred)}</strong></article>
+                                              <article className="report-highlight"><span>Ø Geschwindigkeit</span><strong>{formatBytes(run.average_speed_bytes_per_second)}/s</strong></article>
+                                              <article className="report-highlight"><span>Dauer</span><strong>{formatDuration(run.duration_seconds)}</strong></article>
+                                            </div>
+                                            <p className="report-copy">{run.report}</p>
+                                            <div className="report-detail-grid">
+                                              <article className="report-block">
+                                                <h3>Kennzahlen</h3>
+                                                <p>Start: {formatDateTime(run.started_at)}</p>
+                                                <p>Ende: {formatDateTime(run.finished_at)}</p>
+                                                <p>Trigger: {run.trigger_type}</p>
+                                                <p>Gelöschte Dateien: {run.files_deleted}</p>
+                                                <p>Fehler: {run.error_count}</p>
+                                                <p>Exit-Code: {run.exit_code ?? "-"}</p>
+                                              </article>
+                                              <article className="report-block"><h3>Kommando</h3><code>{run.rclone_command}</code></article>
+                                            </div>
+                                            <article className="report-block">
+                                              <h3>Vollständiges Log</h3>
+                                              {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
+                                            </article>
+                                          </div>
+                                        ) : null}
+                                      </article>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </section>
+                            </div>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
                 </div>
               ) : null}
-            </section>
-
-            <section className="dashboard-split">
-              <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Zeitplan</p><h2>{selectedSyncPair ? `Zeitplan für ${selectedSyncPair.name}` : "Kein Sync ausgewählt"}</h2></div></div>
-                {!selectedSyncPair ? <p className="state">Wähle oben ein Sync-Paar aus, um den Zeitplan zu bearbeiten.</p> : null}
-                {selectedSyncPair ? (
-                  <form className="sync-form compact-form" onSubmit={handleUpdateSchedule}>
-                    <label className="schedule-toggle"><span>Zeitplan aktiv</span><input type="checkbox" checked={scheduleEditState.schedule_enabled} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_enabled: event.target.checked }))} /></label>
-                    <label><span>Intervall</span><select value={scheduleEditState.schedule_type} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="hourly">Stündlich</option><option value="interval">Alle X Minuten</option></select></label>
-                    {scheduleEditState.schedule_type === "interval" ? (
-                      <label><span>Minuten</span><input min={5} step={5} type="number" value={scheduleEditState.schedule_interval_minutes} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_interval_minutes: Number(event.target.value) }))} /></label>
-                    ) : (
-                      <label><span>Uhrzeit</span><input type="time" value={scheduleEditState.schedule_time} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_time: event.target.value }))} /></label>
-                    )}
-                    {scheduleEditState.schedule_type === "weekly" ? (
-                      <label><span>Wochentag</span><select value={scheduleEditState.schedule_weekday} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_weekday: Number(event.target.value) }))}>{weekdayOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-                    ) : null}
-                    <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Zeitplan speichern"}</button>
-                  </form>
-                ) : null}
-              </section>
-
-              <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Run-Historie</p><h2>{selectedSyncPair ? selectedSyncPair.name : "Noch kein Sync-Paar ausgewählt"}</h2></div></div>
-                {!selectedSyncPair ? <p className="state">Wähle oben ein Sync-Paar aus.</p> : null}
-                {selectedSyncPair && runLoading ? <p className="state">Lade letzte Läufe...</p> : null}
-                {selectedSyncPair && !runLoading && runs.length === 0 ? <p className="state">Für dieses Sync-Paar gibt es noch keine Läufe.</p> : null}
-                {selectedSyncPair && runs.length > 0 ? (
-                  <div className="run-list">
-                    {runs.map((run) => (
-                      <button className={`run-card ${selectedRunId === run.id ? "selected" : ""}`} key={run.id} type="button" onClick={() => setSelectedRunId(run.id)}>
-                        <div className="run-card-header">
-                          <span className={`badge ${run.status}`}>{run.status}</span>
-                          <strong>{formatDateTime(run.started_at)}</strong>
-                        </div>
-                        <p>{run.short_log}</p>
-                        <dl className="run-metrics">
-                          <div><dt>Trigger</dt><dd>{run.trigger_type}</dd></div>
-                          <div><dt>Dateien</dt><dd>{run.files_transferred}</dd></div>
-                          <div><dt>Bytes</dt><dd>{formatBytes(run.bytes_transferred)}</dd></div>
-                          <div><dt>Dauer</dt><dd>{run.duration_seconds}s</dd></div>
-                        </dl>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </section>
-
-              <section className="panel report-panel">
-                <div className="panel-header"><div><p className="eyebrow">Bericht</p><h2>{selectedRun ? "Laufdetails" : "Kein Lauf ausgewählt"}</h2></div></div>
-                {!selectedRun ? <p className="state">Wähle links einen Lauf aus, um den Bericht anzuzeigen.</p> : null}
-                {selectedRun ? (
-                  <>
-                    <div className="report-summary">
-                      <article className="report-highlight"><span>Status</span><strong>{selectedRun.status}</strong></article>
-                      <article className="report-highlight"><span>Trigger</span><strong>{selectedRun.trigger_type}</strong></article>
-                      <article className="report-highlight"><span>Exit-Code</span><strong>{selectedRun.exit_code ?? "-"}</strong></article>
-                      <article className="report-highlight"><span>Gelöschte Dateien</span><strong>{selectedRun.files_deleted}</strong></article>
-                    </div>
-                    <p className="report-copy">{selectedRun.report}</p>
-                    <div className="report-detail-grid">
-                      <article className="report-block"><h3>Kennzahlen</h3><p>Dateien: {selectedRun.files_transferred}</p><p>Datenmenge: {formatBytes(selectedRun.bytes_transferred)}</p><p>Fehler: {selectedRun.error_count}</p><p>Gestartet: {formatDateTime(selectedRun.started_at)}</p><p>Beendet: {formatDateTime(selectedRun.finished_at)}</p></article>
-                      <article className="report-block"><h3>Kommando</h3><code>{selectedRun.rclone_command}</code></article>
-                    </div>
-                    <article className="report-block">
-                      <h3>Vollständiges Log</h3>
-                      {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
-                    </article>
-                  </>
-                ) : null}
-              </section>
             </section>
           </>
         ) : activeSection === "users" && currentUser.role === "admin" ? (

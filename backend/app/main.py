@@ -99,6 +99,7 @@ def ensure_dev_schema() -> None:
         "full_log_path": "ALTER TABLE sync_runs ADD COLUMN full_log_path TEXT",
         "rclone_command": "ALTER TABLE sync_runs ADD COLUMN rclone_command TEXT NOT NULL DEFAULT ''",
         "report": "ALTER TABLE sync_runs ADD COLUMN report TEXT NOT NULL DEFAULT ''",
+        "average_speed_bytes_per_second": "ALTER TABLE sync_runs ADD COLUMN average_speed_bytes_per_second INTEGER NOT NULL DEFAULT 0",
     }
 
     pair_columns = set()

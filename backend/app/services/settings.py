@@ -121,6 +121,25 @@ def _send_telegram_message(bot_token: str, chat_id: str, message: str) -> Telegr
     return TelegramTestResult(ok=True, detail="Telegram-Nachricht erfolgreich gesendet.")
 
 
+def _format_bytes(value: int) -> str:
+    if value <= 0:
+        return "0 B"
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    current = float(value)
+    index = 0
+    while current >= 1024 and index < len(units) - 1:
+        current /= 1024
+        index += 1
+    precision = 0 if current >= 10 or index == 0 else 2
+    return f"{current:.{precision}f} {units[index]}"
+
+
+def _format_speed(bytes_per_second: int) -> str:
+    if bytes_per_second <= 0:
+        return "0 B/s"
+    return f"{_format_bytes(bytes_per_second)}/s"
+
+
 def get_rclone_config_status() -> RcloneConfigStatus:
     path = _rclone_config_path()
     if not path.exists():
@@ -217,10 +236,24 @@ def test_telegram(message: str | None = None) -> TelegramTestResult:
     return _send_telegram_message(bot_token, chat_id, text)
 
 
-def send_sync_notification(sync_pair_name: str, run_status: str, short_log: str, report: str) -> TelegramTestResult:
+def send_sync_notification(
+    sync_pair_name: str,
+    run_status: str,
+    short_log: str,
+    report: str,
+    *,
+    files_transferred: int,
+    bytes_transferred: int,
+    duration_seconds: int,
+    average_speed_bytes_per_second: int,
+    started_at: datetime,
+    finished_at: datetime,
+) -> TelegramTestResult:
     settings = _load_telegram_settings()
     if not bool(settings.get("enabled", False)):
         return TelegramTestResult(ok=True, detail="Telegram ist deaktiviert.")
+    if files_transferred <= 0 and bytes_transferred <= 0:
+        return TelegramTestResult(ok=True, detail="Keine Telegram-Nachricht nötig, da keine Dateien bewegt wurden.")
     if run_status == "success" and not bool(settings.get("notify_on_success", False)):
         return TelegramTestResult(ok=True, detail="Erfolgsbenachrichtigungen sind deaktiviert.")
     if run_status != "success" and not bool(settings.get("notify_on_error", True)):
@@ -234,6 +267,12 @@ def send_sync_notification(sync_pair_name: str, run_status: str, short_log: str,
     message = (
         f"Sync: {sync_pair_name}\n"
         f"Status: {run_status}\n"
+        f"Dateien bewegt: {files_transferred}\n"
+        f"Datenmenge: {_format_bytes(bytes_transferred)}\n"
+        f"Dauer: {duration_seconds}s\n"
+        f"Ø Geschwindigkeit: {_format_speed(average_speed_bytes_per_second)}\n"
+        f"Start: {started_at.astimezone().strftime('%d.%m.%Y %H:%M:%S')}\n"
+        f"Ende: {finished_at.astimezone().strftime('%d.%m.%Y %H:%M:%S')}\n"
         f"Zusammenfassung: {short_log}\n\n"
         f"{report[:2500]}"
     )

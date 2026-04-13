@@ -17,6 +17,7 @@ class SyncRunSummary(BaseModel):
     files_deleted: int
     error_count: int
     bytes_transferred: int
+    average_speed_bytes_per_second: int
     exit_code: int | None
     short_log: str
     report: str

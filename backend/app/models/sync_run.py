@@ -25,6 +25,7 @@ class SyncRun(Base):
     files_deleted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     bytes_transferred: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    average_speed_bytes_per_second: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     short_log: Mapped[str] = mapped_column(Text, nullable=False, default="")
     report: Mapped[str] = mapped_column(Text, nullable=False, default="")
