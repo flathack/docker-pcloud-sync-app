@@ -42,6 +42,28 @@ type SyncRunSummary = {
   rclone_command: string;
   created_at: string;
 };
+type SyncRunProgressPoint = {
+  timestamp: string;
+  speed_bytes_per_second: number;
+  bytes_transferred: number;
+  percent_complete: number | null;
+};
+type SyncRunProgressStatus = {
+  run_id: string;
+  status: string;
+  started_at: string;
+  updated_at: string;
+  finished_at: string | null;
+  bytes_transferred: number;
+  total_bytes: number | null;
+  files_transferred: number;
+  total_files: number | null;
+  average_speed_bytes_per_second: number;
+  eta_seconds: number | null;
+  estimated_completion_at: string | null;
+  percent_complete: number | null;
+  history: SyncRunProgressPoint[];
+};
 type BrowserEntry = { name: string; path: string; entry_type: string };
 type BrowserResponse = {
   current_path: string;
@@ -142,6 +164,23 @@ function formatDuration(seconds: number) {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
+function formatPercent(value: number | null) {
+  if (value === null || Number.isNaN(value)) return "Wird berechnet";
+  return `${value.toFixed(0)}%`;
+}
+
+function buildSpeedPolyline(points: SyncRunProgressPoint[]) {
+  if (points.length === 0) return "";
+  const maxSpeed = Math.max(...points.map((point) => point.speed_bytes_per_second), 1);
+  return points
+    .map((point, index) => {
+      const x = points.length === 1 ? 0 : (index / (points.length - 1)) * 100;
+      const y = 100 - (point.speed_bytes_per_second / maxSpeed) * 100;
+      return `${x},${y}`;
+    })
+    .join(" ");
+}
+
 function describeSchedule(pair: Pick<SyncPairSummary, "schedule_enabled" | "schedule_type" | "schedule_interval_minutes" | "schedule_time" | "schedule_weekday">) {
   if (!pair.schedule_enabled) return "Nur manuell";
   if (pair.schedule_type === "interval") return `Alle ${pair.schedule_interval_minutes} Minuten`;
@@ -170,6 +209,7 @@ export function App() {
   const [selectedSyncPairId, setSelectedSyncPairId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedRunLog, setSelectedRunLog] = useState<string>("");
+  const [runProgressById, setRunProgressById] = useState<Record<string, SyncRunProgressStatus>>({});
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [runLoading, setRunLoading] = useState(false);
   const [runActionId, setRunActionId] = useState<string | null>(null);
@@ -294,6 +334,27 @@ export function App() {
     }
   }
 
+  async function loadRunProgress(runId: string) {
+    try {
+      const response = await apiFetch(`/runs/${runId}/progress`, { method: "GET" });
+      if (!response.ok) {
+        if (response.status === 404) {
+          setRunProgressById((current) => {
+            const next = { ...current };
+            delete next[runId];
+            return next;
+          });
+          return;
+        }
+        throw new Error(`Run-Fortschritt antwortet mit Status ${response.status}`);
+      }
+      const data = (await response.json()) as SyncRunProgressStatus;
+      setRunProgressById((current) => ({ ...current, [runId]: data }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    }
+  }
+
   async function loadRcloneStatus() {
     try {
       setSettingsLoading(true);
@@ -399,6 +460,7 @@ export function App() {
       setSelectedSyncPairId(null);
       setSelectedRunId(null);
       setSelectedRunLog("");
+      setRunProgressById({});
       setDashboardLoading(false);
       return;
     }
@@ -430,6 +492,24 @@ export function App() {
     }
     void loadRunLog(selectedRunId);
   }, [selectedRunId]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const runningRunIds = Array.from(new Set(
+      [...runs, ...recentRuns]
+        .filter((run) => run.status === "running")
+        .map((run) => run.id),
+    ));
+    if (runningRunIds.length === 0) return;
+
+    void Promise.all(runningRunIds.map((runId) => loadRunProgress(runId)));
+
+    const intervalId = window.setInterval(() => {
+      void Promise.all(runningRunIds.map((runId) => loadRunProgress(runId)));
+    }, 2000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentUser, runs, recentRuns]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -469,6 +549,7 @@ export function App() {
       setRuns([]);
       setSelectedSyncPairId(null);
       setSelectedRunId(null);
+      setRunProgressById({});
     }
   }
 
@@ -508,7 +589,10 @@ export function App() {
         body: JSON.stringify({ trigger_type: "manual" }),
       });
       if (!response.ok) throw new Error(`Run-Start fehlgeschlagen mit Status ${response.status}`);
+      const startedRun = (await response.json()) as SyncRunSummary;
       setSelectedSyncPairId(id);
+      setSelectedRunId(startedRun.id);
+      await loadRunProgress(startedRun.id);
       await loadDashboardData();
       await loadRuns(id);
     } catch (err) {
@@ -877,46 +961,80 @@ export function App() {
                                 {!runLoading && runs.length === 0 ? <p className="state">Bisher wurden für dieses Sync-Paar noch keine Dateien übertragen.</p> : null}
                                 {runs.length > 0 ? (
                                   <div className="run-table">
-                                    {runs.map((run) => (
-                                      <article className={`run-row ${selectedRunId === run.id ? "selected" : ""}`} key={run.id}>
-                                        <button className="run-row-summary" type="button" onClick={() => setSelectedRunId((current) => current === run.id ? null : run.id)}>
-                                          <span>{formatDateTime(run.started_at)}</span>
-                                          <span>{run.files_transferred}</span>
-                                          <span>{formatBytes(run.bytes_transferred)}</span>
-                                          <span>{formatDuration(run.duration_seconds)}</span>
-                                          <span>{formatBytes(run.average_speed_bytes_per_second)}/s</span>
-                                          <span>{formatDateTime(run.finished_at)}</span>
-                                          <span className={`badge ${run.status}`}>{run.status}</span>
-                                        </button>
-                                        {selectedRunId === run.id ? (
-                                          <div className="run-row-detail">
-                                            <div className="report-summary">
-                                              <article className="report-highlight"><span>Dateien bewegt</span><strong>{run.files_transferred}</strong></article>
-                                              <article className="report-highlight"><span>Transfer-Volumen</span><strong>{formatBytes(run.bytes_transferred)}</strong></article>
-                                              <article className="report-highlight"><span>Ø Geschwindigkeit</span><strong>{formatBytes(run.average_speed_bytes_per_second)}/s</strong></article>
-                                              <article className="report-highlight"><span>Dauer</span><strong>{formatDuration(run.duration_seconds)}</strong></article>
-                                            </div>
-                                            <p className="report-copy">{run.report}</p>
-                                            <div className="report-detail-grid">
+                                    {runs.map((run) => {
+                                      const progress = runProgressById[run.id];
+                                      const progressPoints = progress?.history ?? [];
+                                      const speedPolyline = buildSpeedPolyline(progressPoints);
+                                      const percent = progress?.percent_complete ?? (run.status === "success" ? 100 : null);
+                                      const speedValue = progress?.average_speed_bytes_per_second ?? run.average_speed_bytes_per_second;
+                                      const bytesValue = progress?.bytes_transferred ?? run.bytes_transferred;
+                                      const filesValue = progress?.files_transferred ?? run.files_transferred;
+                                      const finishEstimate = progress?.estimated_completion_at ?? null;
+
+                                      return (
+                                        <article className={`run-row ${selectedRunId === run.id ? "selected" : ""}`} key={run.id}>
+                                          <button className="run-row-summary" type="button" onClick={() => setSelectedRunId((current) => current === run.id ? null : run.id)}>
+                                            <span>{formatDateTime(run.started_at)}</span>
+                                            <span>{filesValue}</span>
+                                            <span>{formatBytes(bytesValue)}</span>
+                                            <span>{run.status === "running" ? "läuft..." : formatDuration(run.duration_seconds)}</span>
+                                            <span>{formatBytes(speedValue)}/s</span>
+                                            <span>{run.status === "running" && finishEstimate ? formatDateTime(finishEstimate) : formatDateTime(run.finished_at)}</span>
+                                            <span className={`badge ${run.status}`}>{run.status}</span>
+                                          </button>
+                                          {selectedRunId === run.id ? (
+                                            <div className="run-row-detail">
+                                              {run.status === "running" && progress ? (
+                                                <section className="live-progress-card">
+                                                  <div className="live-progress-head">
+                                                    <div>
+                                                      <p className="eyebrow">Live-Fortschritt</p>
+                                                      <h3>Kopiervorgang läuft</h3>
+                                                    </div>
+                                                    <strong>{formatPercent(percent)}</strong>
+                                                  </div>
+                                                  <div className="progress-bar-shell" aria-hidden="true">
+                                                    <div className="progress-bar-fill" style={{ width: `${Math.max(4, percent ?? 6)}%` }} />
+                                                    <svg className="progress-speed-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                                      <polyline points={speedPolyline} />
+                                                    </svg>
+                                                  </div>
+                                                  <div className="live-progress-grid">
+                                                    <article className="report-highlight"><span>Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
+                                                    <article className="report-highlight"><span>Dateien bewegt</span><strong>{filesValue}{progress.total_files ? ` / ${progress.total_files}` : ""}</strong></article>
+                                                    <article className="report-highlight"><span>Transfer</span><strong>{formatBytes(bytesValue)}{progress.total_bytes ? ` / ${formatBytes(progress.total_bytes)}` : ""}</strong></article>
+                                                    <article className="report-highlight"><span>Voraussichtliches Ende</span><strong>{finishEstimate ? formatDateTime(finishEstimate) : "Wird berechnet"}</strong></article>
+                                                  </div>
+                                                </section>
+                                              ) : null}
+                                              <div className="report-summary">
+                                                <article className="report-highlight"><span>Dateien bewegt</span><strong>{filesValue}</strong></article>
+                                                <article className="report-highlight"><span>Transfer-Volumen</span><strong>{formatBytes(bytesValue)}</strong></article>
+                                                <article className="report-highlight"><span>Ø Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
+                                                <article className="report-highlight"><span>Dauer</span><strong>{run.status === "running" ? "läuft..." : formatDuration(run.duration_seconds)}</strong></article>
+                                              </div>
+                                              <p className="report-copy">{run.report}</p>
+                                              <div className="report-detail-grid">
+                                                <article className="report-block">
+                                                  <h3>Kennzahlen</h3>
+                                                  <p>Start: {formatDateTime(run.started_at)}</p>
+                                                  <p>Ende: {run.status === "running" && finishEstimate ? formatDateTime(finishEstimate) : formatDateTime(run.finished_at)}</p>
+                                                  <p>Trigger: {run.trigger_type}</p>
+                                                  <p>Gelöschte Dateien: {run.files_deleted}</p>
+                                                  <p>Fehler: {run.error_count}</p>
+                                                  <p>Exit-Code: {run.exit_code ?? "-"}</p>
+                                                </article>
+                                                <article className="report-block"><h3>Kommando</h3><code>{run.rclone_command}</code></article>
+                                              </div>
                                               <article className="report-block">
-                                                <h3>Kennzahlen</h3>
-                                                <p>Start: {formatDateTime(run.started_at)}</p>
-                                                <p>Ende: {formatDateTime(run.finished_at)}</p>
-                                                <p>Trigger: {run.trigger_type}</p>
-                                                <p>Gelöschte Dateien: {run.files_deleted}</p>
-                                                <p>Fehler: {run.error_count}</p>
-                                                <p>Exit-Code: {run.exit_code ?? "-"}</p>
+                                                <h3>Vollständiges Log</h3>
+                                                {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
                                               </article>
-                                              <article className="report-block"><h3>Kommando</h3><code>{run.rclone_command}</code></article>
                                             </div>
-                                            <article className="report-block">
-                                              <h3>Vollständiges Log</h3>
-                                              {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
-                                            </article>
-                                          </div>
-                                        ) : null}
-                                      </article>
-                                    ))}
+                                          ) : null}
+                                        </article>
+                                      );
+                                    })}
                                   </div>
                                 ) : null}
                               </section>

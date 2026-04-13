@@ -671,6 +671,67 @@ select {
   margin-bottom: 18px;
 }
 
+.live-progress-card {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f8fbfe, #eef6fc);
+  border: 1px solid #d8e7f3;
+}
+
+.live-progress-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.live-progress-head strong {
+  font-size: 1.8rem;
+  color: #177fb6;
+}
+
+.progress-bar-shell {
+  position: relative;
+  height: 124px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #eaf4fb, #dceaf6);
+  border: 1px solid #c6dceb;
+}
+
+.progress-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #1d8fcc, #39a9dc);
+  opacity: 0.24;
+  transition: width 500ms ease;
+}
+
+.progress-speed-chart {
+  position: absolute;
+  inset: 14px 12px;
+  width: calc(100% - 24px);
+  height: calc(100% - 28px);
+}
+
+.progress-speed-chart polyline {
+  fill: none;
+  stroke: #177fb6;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.live-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .report-highlight {
   padding: 14px;
   border-radius: 6px;
@@ -950,6 +1011,7 @@ select {
 :root[data-theme="dark"] .sync-card-meta div,
 :root[data-theme="dark"] .run-metrics div,
 :root[data-theme="dark"] .report-highlight,
+:root[data-theme="dark"] .live-progress-card,
 :root[data-theme="dark"] .schedule-toggle,
 :root[data-theme="dark"] .browser-topbar,
 :root[data-theme="dark"] .sync-row-detail,
@@ -1035,6 +1097,21 @@ select {
   color: #6fc3f2;
 }
 
+:root[data-theme="dark"] .progress-bar-shell {
+  background: linear-gradient(180deg, #132435, #183149);
+  border-color: #30506c;
+}
+
+:root[data-theme="dark"] .progress-bar-fill {
+  background: linear-gradient(90deg, #1d8fcc, #63bdf1);
+}
+
+:root[data-theme="dark"] .progress-speed-chart polyline,
+:root[data-theme="dark"] .live-progress-head strong {
+  color: #6fc3f2;
+  stroke: #6fc3f2;
+}
+
 :root[data-theme="dark"] .log-output {
   background: #0b1118;
   color: #dce6f2;
@@ -1065,7 +1142,8 @@ select {
   .report-detail-grid,
   .stats-grid,
   .settings-grid,
-  .sync-expanded-grid {
+  .sync-expanded-grid,
+  .live-progress-grid {
     grid-template-columns: 1fr;
   }
 }

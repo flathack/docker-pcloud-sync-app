@@ -19,7 +19,7 @@ from app.schemas.settings import (
     TelegramTestResult,
 )
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
-from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
+from app.schemas.sync_run import SyncRunCreate, SyncRunProgressStatus, SyncRunSummary
 from app.services import auth as auth_service
 from app.services import browser as browser_service
 from app.services import settings as settings_service
@@ -284,6 +284,22 @@ def get_run_log(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
 
     return {"log": sync_run_service.read_run_log(run)}
+
+
+@router.get("/runs/{run_id}/progress", response_model=SyncRunProgressStatus)
+def get_run_progress(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> SyncRunProgressStatus:
+    run = sync_run_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
+
+    progress = sync_run_service.get_run_progress(run_id)
+    if progress is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Für diesen Run sind keine Live-Daten verfügbar")
+    return progress
 
 
 @router.get("/settings/rclone/status", response_model=RcloneConfigStatus)

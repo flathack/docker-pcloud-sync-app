@@ -8,13 +8,18 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.sync_pair import SyncPair
 from app.models.sync_run import SyncRun
-from app.runners.rclone_runner import run_sync_pair
+from app.runners.rclone_runner import RunnerProgress, run_sync_pair
+from app.schemas.sync_run import SyncRunProgressPoint, SyncRunProgressStatus
 from app.services import settings as settings_service
 from app.services.sync_pairs import calculate_next_run
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+_progress_lock = threading.Lock()
+_run_progress: dict[str, SyncRunProgressStatus] = {}
 
 
 def list_runs(db: Session, limit: int = 50) -> list[SyncRun]:
@@ -41,6 +46,14 @@ def list_runs_for_sync_pair(db: Session, sync_pair_id: str) -> list[SyncRun]:
 
 def get_run(db: Session, run_id: str) -> SyncRun | None:
     return db.get(SyncRun, run_id)
+
+
+def get_run_progress(run_id: str) -> SyncRunProgressStatus | None:
+    with _progress_lock:
+        progress = _run_progress.get(run_id)
+        if progress is None:
+            return None
+        return progress.model_copy(deep=True)
 
 
 def read_run_log(run: SyncRun) -> str:
@@ -77,6 +90,59 @@ def _apply_run_result(db: Session, sync_pair: SyncPair, run: SyncRun) -> None:
         db.refresh(run)
 
 
+def _set_progress_snapshot(
+    run_id: str,
+    *,
+    status: str,
+    started_at: datetime,
+    progress: RunnerProgress,
+    finished_at: datetime | None = None,
+) -> None:
+    with _progress_lock:
+        existing = _run_progress.get(run_id)
+        history = list(existing.history) if existing else []
+        history.append(
+            SyncRunProgressPoint(
+                timestamp=progress.timestamp,
+                speed_bytes_per_second=progress.average_speed_bytes_per_second,
+                bytes_transferred=progress.bytes_transferred,
+                percent_complete=progress.percent_complete,
+            )
+        )
+        history = history[-45:]
+        _run_progress[run_id] = SyncRunProgressStatus(
+            run_id=run_id,
+            status=status,
+            started_at=started_at,
+            updated_at=progress.timestamp,
+            finished_at=finished_at,
+            bytes_transferred=progress.bytes_transferred,
+            total_bytes=progress.total_bytes,
+            files_transferred=progress.files_transferred,
+            total_files=progress.total_files,
+            average_speed_bytes_per_second=progress.average_speed_bytes_per_second,
+            eta_seconds=progress.eta_seconds,
+            estimated_completion_at=progress.estimated_completion_at,
+            percent_complete=progress.percent_complete,
+            history=history,
+        )
+
+
+def _mark_progress_finished(run_id: str, status: str, finished_at: datetime) -> None:
+    with _progress_lock:
+        existing = _run_progress.get(run_id)
+        if existing is None:
+            return
+        existing.status = status
+        existing.finished_at = finished_at
+        existing.updated_at = finished_at
+        existing.eta_seconds = 0 if status == "success" else existing.eta_seconds
+        if status == "success" and (existing.bytes_transferred > 0 or existing.files_transferred > 0):
+            existing.percent_complete = 100.0
+            existing.estimated_completion_at = finished_at
+        _run_progress[run_id] = existing
+
+
 def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
     db = SessionLocal()
     try:
@@ -85,7 +151,15 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
         if sync_pair is None or run is None:
             return
 
-        result = run_sync_pair(sync_pair)
+        def handle_progress(progress: RunnerProgress) -> None:
+            _set_progress_snapshot(
+                run_id,
+                status="running",
+                started_at=run.started_at,
+                progress=progress,
+            )
+
+        result = run_sync_pair(sync_pair, progress_callback=handle_progress)
 
         run.status = result.status
         run.started_at = result.started_at
@@ -117,6 +191,7 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
         db.add(run)
         db.add(sync_pair)
         db.commit()
+        _mark_progress_finished(run_id, result.status, result.finished_at)
         should_keep_run = run.status == "error" or _should_keep_run(run)
         if should_keep_run:
             db.refresh(run)
@@ -127,12 +202,12 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
     except Exception as exc:
         sync_pair = db.get(SyncPair, sync_pair_id)
         run = db.get(SyncRun, run_id)
+        finished_at = utc_now()
         if sync_pair is not None:
             sync_pair.status = "error"
             sync_pair.last_status = "error"
             db.add(sync_pair)
         if run is not None:
-            finished_at = utc_now()
             run.status = "error"
             run.finished_at = finished_at
             run.duration_seconds = max(1, int((finished_at - run.started_at).total_seconds()))
@@ -142,6 +217,7 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
             run.report = f"Der Hintergrundlauf ist mit einem internen Fehler abgebrochen: {exc}"
             db.add(run)
         db.commit()
+        _mark_progress_finished(run_id, "error", finished_at)
     finally:
         db.close()
 
@@ -239,6 +315,24 @@ def start_sync_run_async(db: Session, sync_pair: SyncPair, trigger_type: str = "
     db.add(sync_pair)
     db.commit()
     db.refresh(run)
+
+    with _progress_lock:
+        _run_progress[run.id] = SyncRunProgressStatus(
+            run_id=run.id,
+            status="running",
+            started_at=started_at,
+            updated_at=started_at,
+            finished_at=None,
+            bytes_transferred=0,
+            total_bytes=None,
+            files_transferred=0,
+            total_files=None,
+            average_speed_bytes_per_second=0,
+            eta_seconds=None,
+            estimated_completion_at=None,
+            percent_complete=None,
+            history=[],
+        )
 
     worker = threading.Thread(
         target=_execute_sync_run_in_background,
