@@ -40,7 +40,7 @@ type SyncRunSummary = {
   created_at: string;
 };
 
-const apiBaseUrl = "http://localhost:8000/api";
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 const initialFormState = {
   name: "",
@@ -56,13 +56,16 @@ const initialLoginState = {
 };
 
 async function apiFetch(path: string, init?: RequestInit) {
+  const headers = new Headers(init?.headers);
+  const hasBody = init?.body !== undefined && init?.body !== null;
+  if (hasBody && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   return fetch(`${apiBaseUrl}${path}`, {
     credentials: "include",
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
 }
 

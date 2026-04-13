@@ -767,6 +767,7 @@ uvicorn app.main:app --reload
 
 # Frontend
 cd frontend
+set VITE_API_BASE_URL=http://localhost:8000/api
 npm install
 npm run dev
 ```
