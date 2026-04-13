@@ -11,6 +11,7 @@ services:
       APP_SECRET_KEY: change-me
       DATABASE_URL: sqlite:////app/backend/data/app.db
       DEFAULT_TIMEZONE: Europe/Berlin
+      FILE_BROWSER_ROOTS: /app/backend/data,/app/data/config,/mnt/nas
       RCLONE_CONFIG: /app/data/config/rclone/rclone.conf
       RCLONE_GLOBAL_FLAGS: --use-json-log --log-level INFO --stats 10s --stats-one-line-json
       TELEGRAM_ENABLED: "false"
@@ -18,4 +19,6 @@ services:
       - ./backend/data:/app/backend/data
       - ./data/logs:/app/data/logs
       - ./data/config:/app/data/config
+      # Beispiel fuer einen echten Host- oder NAS-Mount:
+      # - /mnt/nas:/mnt/nas
     restart: unless-stopped

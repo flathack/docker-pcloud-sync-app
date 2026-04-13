@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_current_user
 from app.db.session import get_db
 from app.schemas.auth import LoginRequest, UserSummary
+from app.schemas.browser import BrowserResponse
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
 from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
 from app.services import auth as auth_service
+from app.services import browser as browser_service
 from app.services import sync_pairs as sync_pair_service
 from app.services import sync_runs as sync_run_service
 
@@ -16,6 +18,22 @@ router = APIRouter(prefix="/api")
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.get("/browser", response_model=BrowserResponse)
+def browse(
+    path: str | None = None,
+    backend_type: str = "local",
+    current_user: UserSummary = Depends(require_current_user),
+) -> BrowserResponse:
+    try:
+        return browser_service.browse(path, backend_type=backend_type)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/auth/login", response_model=UserSummary)

@@ -40,6 +40,19 @@ type SyncRunSummary = {
   created_at: string;
 };
 
+type BrowserEntry = {
+  name: string;
+  path: string;
+  entry_type: string;
+};
+
+type BrowserResponse = {
+  current_path: string;
+  parent_path: string | null;
+  backend_type: string;
+  entries: BrowserEntry[];
+};
+
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 const initialFormState = {
@@ -69,6 +82,9 @@ async function apiFetch(path: string, init?: RequestInit) {
   });
 }
 
+type BrowserField = "source_path" | "destination_path" | null;
+type BrowserMode = "local" | "remote";
+
 export function App() {
   const [currentUser, setCurrentUser] = useState<UserSummary | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -83,6 +99,10 @@ export function App() {
   const [runs, setRuns] = useState<SyncRunSummary[]>([]);
   const [runLoading, setRunLoading] = useState(false);
   const [runActionId, setRunActionId] = useState<string | null>(null);
+  const [browserField, setBrowserField] = useState<BrowserField>(null);
+  const [browserMode, setBrowserMode] = useState<BrowserMode>("local");
+  const [browserData, setBrowserData] = useState<BrowserResponse | null>(null);
+  const [browserLoading, setBrowserLoading] = useState(false);
 
   async function checkSession() {
     try {
@@ -120,6 +140,54 @@ export function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadBrowser(path: string | null, mode: BrowserMode) {
+    try {
+      setBrowserLoading(true);
+      setError(null);
+      const params = new URLSearchParams();
+      params.set("backend_type", mode);
+      if (path) {
+        params.set("path", path);
+      }
+
+      const response = await apiFetch(`/browser?${params.toString()}`, { method: "GET" });
+      if (!response.ok) {
+        throw new Error(`Browser antwortet mit Status ${response.status}`);
+      }
+
+      const data = (await response.json()) as BrowserResponse;
+      setBrowserData(data);
+      setBrowserMode(mode);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setBrowserLoading(false);
+    }
+  }
+
+  function openBrowser(field: BrowserField, mode: BrowserMode) {
+    setBrowserField(field);
+    const currentPath = field ? formState[field] : "";
+    void loadBrowser(currentPath || null, mode);
+  }
+
+  function closeBrowser() {
+    setBrowserField(null);
+    setBrowserData(null);
+  }
+
+  function applyBrowserPath(path: string) {
+    if (!browserField) {
+      return;
+    }
+
+    setFormState((current) => ({
+      ...current,
+      [browserField]: path,
+    }));
+    closeBrowser();
   }
 
   useEffect(() => {
@@ -386,29 +454,56 @@ export function App() {
             />
           </label>
 
-          <label>
+          <label className="path-field">
             <span>Quelle</span>
-            <input
-              required
-              value={formState.source_path}
-              onChange={(event) =>
-                setFormState((current) => ({ ...current, source_path: event.target.value }))
-              }
-            />
+            <div className="path-input-row">
+              <input
+                required
+                value={formState.source_path}
+                onChange={(event) =>
+                  setFormState((current) => ({ ...current, source_path: event.target.value }))
+                }
+              />
+              <button
+                className="table-button"
+                type="button"
+                onClick={() => openBrowser("source_path", "local")}
+              >
+                Browser
+              </button>
+            </div>
           </label>
 
-          <label>
+          <label className="path-field">
             <span>Ziel</span>
-            <input
-              required
-              value={formState.destination_path}
-              onChange={(event) =>
-                setFormState((current) => ({
-                  ...current,
-                  destination_path: event.target.value,
-                }))
-              }
-            />
+            <div className="path-input-row">
+              <input
+                required
+                value={formState.destination_path}
+                onChange={(event) =>
+                  setFormState((current) => ({
+                    ...current,
+                    destination_path: event.target.value,
+                  }))
+                }
+              />
+              <div className="inline-actions">
+                <button
+                  className="table-button"
+                  type="button"
+                  onClick={() => openBrowser("destination_path", "local")}
+                >
+                  Lokal
+                </button>
+                <button
+                  className="table-button primary-inline"
+                  type="button"
+                  onClick={() => openBrowser("destination_path", "remote")}
+                >
+                  Remote
+                </button>
+              </div>
+            </div>
           </label>
 
           <label>
@@ -568,6 +663,99 @@ export function App() {
           </div>
         ) : null}
       </section>
+
+      {browserField ? (
+        <div className="browser-overlay" role="dialog" aria-modal="true">
+          <section className="browser-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Pfadbrowser</p>
+                <h2>
+                  {browserField === "source_path" ? "Quelle waehlen" : "Ziel waehlen"}
+                </h2>
+              </div>
+              <button className="table-button" type="button" onClick={closeBrowser}>
+                Schliessen
+              </button>
+            </div>
+
+            <div className="browser-toolbar">
+              <span className="browser-path">
+                {browserData?.current_path || (browserMode === "remote" ? "pcloud:" : "Wurzeln")}
+              </span>
+              <div className="inline-actions">
+                <button
+                  className="table-button"
+                  type="button"
+                  disabled={browserMode === "local"}
+                  onClick={() => void loadBrowser(null, "local")}
+                >
+                  Lokal
+                </button>
+                <button
+                  className="table-button primary-inline"
+                  type="button"
+                  disabled={browserMode === "remote"}
+                  onClick={() => void loadBrowser(null, "remote")}
+                >
+                  Remote
+                </button>
+                <button
+                  className="table-button"
+                  type="button"
+                  disabled={!browserData?.parent_path}
+                  onClick={() => void loadBrowser(browserData?.parent_path ?? null, browserMode)}
+                >
+                  Hoch
+                </button>
+              </div>
+            </div>
+
+            {browserLoading ? <p className="state">Lade Ordner...</p> : null}
+            {!browserLoading && browserData?.entries.length === 0 ? (
+              <p className="state">Keine Unterordner gefunden.</p>
+            ) : null}
+
+            <div className="browser-list">
+              {browserData?.entries.map((entry) => (
+                <article className="browser-entry" key={entry.path}>
+                  <div>
+                    <strong>{entry.name}</strong>
+                    <p>{entry.path}</p>
+                  </div>
+                  <div className="inline-actions">
+                    <button
+                      className="table-button"
+                      type="button"
+                      onClick={() => void loadBrowser(entry.path, browserMode)}
+                    >
+                      Oeffnen
+                    </button>
+                    <button
+                      className="table-button primary-inline"
+                      type="button"
+                      onClick={() => applyBrowserPath(entry.path)}
+                    >
+                      Auswaehlen
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="browser-footer">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => applyBrowserPath(browserData?.current_path || "")}
+                disabled={!browserData?.current_path}
+              >
+                Aktuellen Pfad uebernehmen
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
