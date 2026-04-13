@@ -1,6 +1,6 @@
 services:
   pcloud-sync-app:
-    image: ghcr.io/flathack/pcloud-sync-docker-app:latest
+    image: ghcr.io/flathack/docker-pcloud-sync-app:latest
     container_name: pcloud-sync-app
     ports:
       - "8000:8000"

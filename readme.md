@@ -35,15 +35,15 @@ Fuer wiederholbare Updates ist das Projekt jetzt auf einen Registry-basierten Ab
 Die Action veroeffentlicht Images nach diesem Muster:
 
 ```text
-ghcr.io/GITHUB_OWNER/pcloud-sync-docker-app:latest
-ghcr.io/GITHUB_OWNER/pcloud-sync-docker-app:main
-ghcr.io/GITHUB_OWNER/pcloud-sync-docker-app:sha-...
+ghcr.io/GITHUB_OWNER/docker-pcloud-sync-app:latest
+ghcr.io/GITHUB_OWNER/docker-pcloud-sync-app:main
+ghcr.io/GITHUB_OWNER/docker-pcloud-sync-app:sha-...
 ```
 
 Mit deinem Account ergibt sich also spaeter z. B.:
 
 ```text
-ghcr.io/flathack/pcloud-sync-docker-app:latest
+ghcr.io/flathack/docker-pcloud-sync-app:latest
 ```
 
 ### Portainer-Stack
