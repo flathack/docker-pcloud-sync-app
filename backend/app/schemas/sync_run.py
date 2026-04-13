@@ -19,6 +19,7 @@ class SyncRunSummary(BaseModel):
     bytes_transferred: int
     exit_code: int | None
     short_log: str
+    report: str
     full_log_path: str | None
     rclone_command: str
     created_at: datetime

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_current_user
 from app.db.session import get_db
 from app.schemas.auth import LoginRequest, UserSummary
-from app.schemas.browser import BrowserResponse
+from app.schemas.browser import BrowserCreateDirectoryRequest, BrowserResponse
 from app.schemas.settings import RcloneConfigStatus, RcloneConfigTestRequest, RcloneConfigTestResult
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
 from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
@@ -30,6 +30,25 @@ def browse(
 ) -> BrowserResponse:
     try:
         return browser_service.browse(path, backend_type=backend_type)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/browser/directories", response_model=BrowserResponse, status_code=status.HTTP_201_CREATED)
+def create_browser_directory(
+    payload: BrowserCreateDirectoryRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> BrowserResponse:
+    try:
+        return browser_service.create_directory(
+            payload.path,
+            payload.directory_name,
+            backend_type=payload.backend_type,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except PermissionError as exc:
@@ -128,6 +147,15 @@ def list_sync_pair_runs(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync-Paar nicht gefunden")
 
     return sync_run_service.list_runs_for_sync_pair(db, sync_pair_id)
+
+
+@router.get("/runs", response_model=list[SyncRunSummary])
+def list_runs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> list[SyncRunSummary]:
+    return sync_run_service.list_runs(db, limit=min(max(limit, 1), 250))
 
 
 @router.post(

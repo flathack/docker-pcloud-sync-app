@@ -19,6 +19,7 @@ class RunnerResult:
     status: str
     exit_code: int | None
     short_log: str
+    report: str
     full_log_path: str | None
     command: str
     started_at: datetime
@@ -101,11 +102,17 @@ def run_sync_pair(sync_pair: SyncPair) -> RunnerResult:
     duration_seconds = max(1, int((finished_at - started_at).total_seconds()))
     status = "success" if completed.returncode == 0 else "error"
     short_log = "rclone-Lauf erfolgreich abgeschlossen." if status == "success" else "rclone-Lauf mit Fehler beendet."
+    report = (
+        f"Sync '{sync_pair.name}' wurde per {sync_pair.mode} von {sync_pair.source_path} nach "
+        f"{sync_pair.destination_path} ausgefuehrt. Status: {status}. Exit-Code: {completed.returncode}. "
+        f"Dauer: {duration_seconds}s."
+    )
 
     return RunnerResult(
         status=status,
         exit_code=completed.returncode,
         short_log=short_log,
+        report=report,
         full_log_path=str(log_path),
         command=command_string,
         started_at=started_at,

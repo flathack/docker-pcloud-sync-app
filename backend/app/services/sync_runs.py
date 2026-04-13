@@ -6,6 +6,12 @@ from sqlalchemy.orm import Session
 from app.models.sync_pair import SyncPair
 from app.models.sync_run import SyncRun
 from app.runners.rclone_runner import run_sync_pair
+from app.services.sync_pairs import calculate_next_run
+
+
+def list_runs(db: Session, limit: int = 50) -> list[SyncRun]:
+    statement = select(SyncRun).order_by(SyncRun.started_at.desc()).limit(limit)
+    return list(db.scalars(statement))
 
 
 def list_runs_for_sync_pair(db: Session, sync_pair_id: str) -> list[SyncRun]:
@@ -48,12 +54,22 @@ def start_sync_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual
         bytes_transferred=result.bytes_transferred,
         exit_code=result.exit_code,
         short_log=result.short_log,
+        report=result.report,
         full_log_path=result.full_log_path,
         rclone_command=result.command,
     )
 
     sync_pair.status = "idle" if result.status == "success" else "error"
     sync_pair.last_status = result.status
+    sync_pair.last_run_at = result.finished_at
+    sync_pair.next_run_at = calculate_next_run(
+        sync_pair.schedule_enabled,
+        sync_pair.schedule_type,
+        sync_pair.schedule_interval_minutes,
+        sync_pair.schedule_time,
+        sync_pair.schedule_weekday,
+        now=result.finished_at,
+    )
 
     db.add(run)
     db.add(sync_pair)
