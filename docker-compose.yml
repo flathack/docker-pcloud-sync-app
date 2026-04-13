@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  pcloud-sync-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pcloud-sync-app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      APP_SECRET_KEY: change-me
+      DATABASE_URL: sqlite:////app/backend/data/app.db
+      DEFAULT_TIMEZONE: Europe/Berlin
+      RCLONE_CONFIG: /app/data/config/rclone/rclone.conf
+      RCLONE_GLOBAL_FLAGS: --use-json-log --log-level INFO --stats 10s --stats-one-line-json
+      TELEGRAM_ENABLED: "false"
+    volumes:
+      - ./backend/data:/app/backend/data
+      - ./data/logs:/app/data/logs
+      - ./data/config:/app/data/config
+    restart: unless-stopped

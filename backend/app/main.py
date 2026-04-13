@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.db.base import Base
@@ -18,6 +21,10 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+frontend_dist = Path(__file__).resolve().parents[2] / "frontend-dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 
 def seed_sync_pairs() -> None:
