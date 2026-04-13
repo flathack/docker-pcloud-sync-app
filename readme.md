@@ -19,6 +19,50 @@ Benutzername: admin
 Passwort: change-me-now
 ```
 
+## Deployment Automation
+
+Fuer wiederholbare Updates ist das Projekt jetzt auf einen Registry-basierten Ablauf ausgelegt:
+
+- GitHub Actions baut bei Push auf `main` oder `master` automatisch ein Docker-Image
+- Das Image wird nach `GHCR` gepusht
+- Gebaut wird direkt fuer `linux/amd64` und `linux/arm64`
+- Fuer Portainer gibt es eine separate Stack-Datei: `docker-compose.portainer.yml`
+
+### CI-Datei
+
+- `.github/workflows/docker-image.yml`
+
+Die Action veroeffentlicht Images nach diesem Muster:
+
+```text
+ghcr.io/GITHUB_OWNER/pcloud-sync-docker-app:latest
+ghcr.io/GITHUB_OWNER/pcloud-sync-docker-app:main
+ghcr.io/GITHUB_OWNER/pcloud-sync-docker-app:sha-...
+```
+
+Mit deinem Account ergibt sich also spaeter z. B.:
+
+```text
+ghcr.io/flathack/pcloud-sync-docker-app:latest
+```
+
+### Portainer-Stack
+
+- `docker-compose.portainer.yml`
+
+Vor dem Deploy in Portainer muessen dort mindestens diese Werte ersetzt werden:
+
+- `REPLACE_WITH_A_LONG_RANDOM_SECRET`
+- `REPLACE_WITH_A_STRONG_PASSWORD`
+- `/volume1/YOUR_NAS_SHARE`
+
+### Empfohlener Update-Ablauf
+
+1. Repository nach GitHub pushen
+2. GitHub Action baut und pusht das Image nach GHCR
+3. Portainer-Stack nutzt `docker-compose.portainer.yml`
+4. In Portainer `Pull and redeploy` bzw. `Redeploy` ausfuehren
+
 ## Zielbild
 
 Web-Anwendung zur Verwaltung und Beobachtung von Synchronisationen zwischen lokalen oder NAS-Ordnern und pCloud-Ordnern. Die App laeuft lokal in VSCode und spaeter produktiv in Docker auf einem Server oder NAS.

@@ -1,0 +1,23 @@
+services:
+  pcloud-sync-app:
+    image: ghcr.io/flathack/pcloud-sync-docker-app:latest
+    container_name: pcloud-sync-app
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+      APP_SECRET_KEY: REPLACE_WITH_A_LONG_RANDOM_SECRET
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: REPLACE_WITH_A_STRONG_PASSWORD
+      DATABASE_URL: sqlite:////app/backend/data/app.db
+      DEFAULT_TIMEZONE: Europe/Berlin
+      FILE_BROWSER_ROOTS: /app/backend/data,/app/data/config,/mnt/nas
+      RCLONE_CONFIG: /app/data/config/rclone/rclone.conf
+      RCLONE_GLOBAL_FLAGS: --use-json-log --log-level INFO --stats 10s --stats-one-line-json
+      TELEGRAM_ENABLED: "false"
+    volumes:
+      - /volume1/docker/pcloud-sync/backend-data:/app/backend/data
+      - /volume1/docker/pcloud-sync/logs:/app/data/logs
+      - /volume1/docker/pcloud-sync/config:/app/data/config
+      - /volume1/YOUR_NAS_SHARE:/mnt/nas
+    restart: unless-stopped
