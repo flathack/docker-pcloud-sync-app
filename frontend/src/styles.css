@@ -103,6 +103,10 @@ body {
   overflow-x: auto;
 }
 
+.dashboard-panel {
+  margin-bottom: 24px;
+}
+
 .sync-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -151,6 +155,17 @@ body {
 .table-button {
   background: #eef3f8;
   color: #22405b;
+}
+
+.primary-inline {
+  background: #16324b;
+  color: #f8fbff;
+}
+
+.action-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 table {
@@ -205,6 +220,42 @@ th {
   color: #9f2317;
 }
 
+.run-list {
+  display: grid;
+  gap: 14px;
+}
+
+.run-card {
+  padding: 18px;
+  border: 1px solid rgba(19, 33, 47, 0.08);
+  border-radius: 18px;
+  background: #f9fbfd;
+}
+
+.run-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.run-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.run-metrics dt {
+  font-size: 0.8rem;
+  color: #4b6782;
+}
+
+.run-metrics dd {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+
 @media (max-width: 720px) {
   .hero {
     grid-template-columns: 1fr;
@@ -217,5 +268,14 @@ th {
   .page-shell {
     width: min(100% - 24px, 1100px);
     padding-top: 20px;
+  }
+
+  .run-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .run-metrics {
+    grid-template-columns: 1fr 1fr;
   }
 }

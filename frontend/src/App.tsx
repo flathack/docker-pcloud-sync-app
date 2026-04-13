@@ -14,6 +14,22 @@ type SyncPairSummary = {
   updated_at: string;
 };
 
+type SyncRunSummary = {
+  id: string;
+  sync_pair_id: string;
+  trigger_type: string;
+  status: string;
+  started_at: string;
+  finished_at: string;
+  duration_seconds: number;
+  files_transferred: number;
+  files_deleted: number;
+  error_count: number;
+  bytes_transferred: number;
+  short_log: string;
+  created_at: string;
+};
+
 const initialFormState = {
   name: "",
   source_path: "",
@@ -28,6 +44,10 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
+  const [selectedSyncPairId, setSelectedSyncPairId] = useState<string | null>(null);
+  const [runs, setRuns] = useState<SyncRunSummary[]>([]);
+  const [runLoading, setRunLoading] = useState(false);
+  const [runActionId, setRunActionId] = useState<string | null>(null);
 
   async function loadSyncPairs() {
     try {
@@ -39,6 +59,7 @@ export function App() {
 
       const data = (await response.json()) as SyncPairSummary[];
       setSyncPairs(data);
+      setSelectedSyncPairId((current) => current ?? data[0]?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
@@ -49,6 +70,34 @@ export function App() {
   useEffect(() => {
     void loadSyncPairs();
   }, []);
+
+  useEffect(() => {
+    if (!selectedSyncPairId) {
+      setRuns([]);
+      return;
+    }
+
+    async function loadRuns() {
+      try {
+        setRunLoading(true);
+        const response = await fetch(
+          `http://localhost:8000/api/sync-pairs/${selectedSyncPairId}/runs`,
+        );
+        if (!response.ok) {
+          throw new Error(`Run-Historie antwortet mit Status ${response.status}`);
+        }
+
+        const data = (await response.json()) as SyncRunSummary[];
+        setRuns(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+      } finally {
+        setRunLoading(false);
+      }
+    }
+
+    void loadRuns();
+  }, [selectedSyncPairId]);
 
   async function handleCreateSyncPair(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -88,11 +137,46 @@ export function App() {
         throw new Error(`Loeschen fehlgeschlagen mit Status ${response.status}`);
       }
 
+      setSelectedSyncPairId((current) => (current === id ? null : current));
       await loadSyncPairs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     }
   }
+
+  async function handleStartRun(id: string) {
+    try {
+      setRunActionId(id);
+      setError(null);
+      const response = await fetch(`http://localhost:8000/api/sync-pairs/${id}/run`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ trigger_type: "manual" }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Run-Start fehlgeschlagen mit Status ${response.status}`);
+      }
+
+      setSelectedSyncPairId(id);
+      await loadSyncPairs();
+      const runsResponse = await fetch(`http://localhost:8000/api/sync-pairs/${id}/runs`);
+      if (!runsResponse.ok) {
+        throw new Error(`Run-Historie antwortet mit Status ${runsResponse.status}`);
+      }
+
+      const runsData = (await runsResponse.json()) as SyncRunSummary[];
+      setRuns(runsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setRunActionId(null);
+    }
+  }
+
+  const selectedSyncPair = syncPairs.find((pair) => pair.id === selectedSyncPairId) ?? null;
 
   return (
     <main className="page-shell">
@@ -191,7 +275,7 @@ export function App() {
         </form>
       </section>
 
-      <section className="panel">
+      <section className="panel dashboard-panel">
         <div className="panel-header">
           <div>
             <p className="eyebrow">Dashboard</p>
@@ -232,18 +316,85 @@ export function App() {
                     <td>{pair.last_status}</td>
                     <td>{pair.enabled ? "ja" : "nein"}</td>
                     <td>
-                      <button
-                        className="table-button"
-                        type="button"
-                        onClick={() => void handleDeleteSyncPair(pair.id)}
-                      >
-                        Loeschen
-                      </button>
+                      <div className="action-stack">
+                        <button
+                          className="table-button"
+                          type="button"
+                          onClick={() => setSelectedSyncPairId(pair.id)}
+                        >
+                          Details
+                        </button>
+                        <button
+                          className="table-button primary-inline"
+                          type="button"
+                          disabled={runActionId === pair.id}
+                          onClick={() => void handleStartRun(pair.id)}
+                        >
+                          {runActionId === pair.id ? "Laeuft..." : "Run now"}
+                        </button>
+                        <button
+                          className="table-button"
+                          type="button"
+                          onClick={() => void handleDeleteSyncPair(pair.id)}
+                        >
+                          Loeschen
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Run-Historie</p>
+            <h2>
+              {selectedSyncPair ? selectedSyncPair.name : "Noch kein Sync-Paar ausgewaehlt"}
+            </h2>
+          </div>
+        </div>
+
+        {!selectedSyncPair ? <p className="state">Waehle oben ein Sync-Paar aus.</p> : null}
+        {selectedSyncPair && runLoading ? <p className="state">Lade letzte Laeufe...</p> : null}
+
+        {selectedSyncPair && !runLoading && runs.length === 0 ? (
+          <p className="state">Fuer dieses Sync-Paar gibt es noch keine Laeufe.</p>
+        ) : null}
+
+        {selectedSyncPair && runs.length > 0 ? (
+          <div className="run-list">
+            {runs.map((run) => (
+              <article className="run-card" key={run.id}>
+                <div className="run-card-header">
+                  <span className={`badge ${run.status}`}>{run.status}</span>
+                  <strong>{new Date(run.started_at).toLocaleString("de-DE")}</strong>
+                </div>
+                <p>{run.short_log}</p>
+                <dl className="run-metrics">
+                  <div>
+                    <dt>Dateien</dt>
+                    <dd>{run.files_transferred}</dd>
+                  </div>
+                  <div>
+                    <dt>Bytes</dt>
+                    <dd>{run.bytes_transferred}</dd>
+                  </div>
+                  <div>
+                    <dt>Dauer</dt>
+                    <dd>{run.duration_seconds}s</dd>
+                  </div>
+                  <div>
+                    <dt>Fehler</dt>
+                    <dd>{run.error_count}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
           </div>
         ) : null}
       </section>
