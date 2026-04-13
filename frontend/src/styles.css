@@ -27,6 +27,10 @@ body {
   padding: 32px 0 48px;
 }
 
+.auth-shell {
+  width: min(760px, calc(100% - 32px));
+}
+
 .hero,
 .panel {
   background: rgba(255, 255, 255, 0.88);
@@ -42,6 +46,14 @@ body {
   align-items: end;
   padding: 32px;
   margin-bottom: 24px;
+}
+
+.auth-hero {
+  grid-template-columns: 1fr;
+}
+
+.auth-panel {
+  max-width: 760px;
 }
 
 .eyebrow {
@@ -70,6 +82,12 @@ body {
   background: linear-gradient(135deg, #16324b, #2b567d);
   color: #f8fbff;
   text-align: center;
+}
+
+.hero-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: stretch;
 }
 
 .hero-stat span {
@@ -155,6 +173,10 @@ body {
 .table-button {
   background: #eef3f8;
   color: #22405b;
+}
+
+.logout-button {
+  padding-block: 12px;
 }
 
 .primary-inline {

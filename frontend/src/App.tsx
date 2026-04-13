@@ -1,5 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 
+type UserSummary = {
+  username: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+};
+
 type SyncPairSummary = {
   id: string;
   name: string;
@@ -26,9 +33,14 @@ type SyncRunSummary = {
   files_deleted: number;
   error_count: number;
   bytes_transferred: number;
+  exit_code: number | null;
   short_log: string;
+  full_log_path: string | null;
+  rclone_command: string;
   created_at: string;
 };
+
+const apiBaseUrl = "http://localhost:8000/api";
 
 const initialFormState = {
   name: "",
@@ -38,7 +50,27 @@ const initialFormState = {
   direction: "push",
 };
 
+const initialLoginState = {
+  username: "admin",
+  password: "change-me-now",
+};
+
+async function apiFetch(path: string, init?: RequestInit) {
+  return fetch(`${apiBaseUrl}${path}`, {
+    credentials: "include",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+  });
+}
+
 export function App() {
+  const [currentUser, setCurrentUser] = useState<UserSummary | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
+  const [loginState, setLoginState] = useState(initialLoginState);
   const [syncPairs, setSyncPairs] = useState<SyncPairSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,10 +81,30 @@ export function App() {
   const [runLoading, setRunLoading] = useState(false);
   const [runActionId, setRunActionId] = useState<string | null>(null);
 
+  async function checkSession() {
+    try {
+      const response = await apiFetch("/auth/me", { method: "GET" });
+      if (response.status === 401) {
+        setCurrentUser(null);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Session-Pruefung fehlgeschlagen mit Status ${response.status}`);
+      }
+
+      const user = (await response.json()) as UserSummary;
+      setCurrentUser(user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setSessionLoading(false);
+    }
+  }
+
   async function loadSyncPairs() {
     try {
       setError(null);
-      const response = await fetch("http://localhost:8000/api/sync-pairs");
+      const response = await apiFetch("/sync-pairs", { method: "GET" });
       if (!response.ok) {
         throw new Error(`API antwortet mit Status ${response.status}`);
       }
@@ -68,11 +120,24 @@ export function App() {
   }
 
   useEffect(() => {
-    void loadSyncPairs();
+    void checkSession();
   }, []);
 
   useEffect(() => {
-    if (!selectedSyncPairId) {
+    if (!currentUser) {
+      setSyncPairs([]);
+      setRuns([]);
+      setSelectedSyncPairId(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    void loadSyncPairs();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!selectedSyncPairId || !currentUser) {
       setRuns([]);
       return;
     }
@@ -80,9 +145,9 @@ export function App() {
     async function loadRuns() {
       try {
         setRunLoading(true);
-        const response = await fetch(
-          `http://localhost:8000/api/sync-pairs/${selectedSyncPairId}/runs`,
-        );
+        const response = await apiFetch(`/sync-pairs/${selectedSyncPairId}/runs`, {
+          method: "GET",
+        });
         if (!response.ok) {
           throw new Error(`Run-Historie antwortet mit Status ${response.status}`);
         }
@@ -97,7 +162,41 @@ export function App() {
     }
 
     void loadRuns();
-  }, [selectedSyncPairId]);
+  }, [selectedSyncPairId, currentUser]);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify(loginState),
+      });
+      if (!response.ok) {
+        throw new Error("Login fehlgeschlagen. Bitte Zugangsdaten pruefen.");
+      }
+
+      const user = (await response.json()) as UserSummary;
+      setCurrentUser(user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setLoginSubmitting(false);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } finally {
+      setCurrentUser(null);
+      setSyncPairs([]);
+      setRuns([]);
+      setSelectedSyncPairId(null);
+    }
+  }
 
   async function handleCreateSyncPair(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,11 +204,8 @@ export function App() {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/sync-pairs", {
+      const response = await apiFetch("/sync-pairs", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(formState),
       });
 
@@ -129,7 +225,7 @@ export function App() {
   async function handleDeleteSyncPair(id: string) {
     try {
       setError(null);
-      const response = await fetch(`http://localhost:8000/api/sync-pairs/${id}`, {
+      const response = await apiFetch(`/sync-pairs/${id}`, {
         method: "DELETE",
       });
 
@@ -148,11 +244,8 @@ export function App() {
     try {
       setRunActionId(id);
       setError(null);
-      const response = await fetch(`http://localhost:8000/api/sync-pairs/${id}/run`, {
+      const response = await apiFetch(`/sync-pairs/${id}/run`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ trigger_type: "manual" }),
       });
 
@@ -162,7 +255,9 @@ export function App() {
 
       setSelectedSyncPairId(id);
       await loadSyncPairs();
-      const runsResponse = await fetch(`http://localhost:8000/api/sync-pairs/${id}/runs`);
+      const runsResponse = await apiFetch(`/sync-pairs/${id}/runs`, {
+        method: "GET",
+      });
       if (!runsResponse.ok) {
         throw new Error(`Run-Historie antwortet mit Status ${runsResponse.status}`);
       }
@@ -178,6 +273,73 @@ export function App() {
 
   const selectedSyncPair = syncPairs.find((pair) => pair.id === selectedSyncPairId) ?? null;
 
+  if (sessionLoading) {
+    return (
+      <main className="page-shell">
+        <section className="panel">
+          <p className="state">Pruefe Anmeldung...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <main className="page-shell auth-shell">
+        <section className="hero auth-hero">
+          <div>
+            <p className="eyebrow">PCloud Sync Docker App</p>
+            <h1>Anmeldung fuer das Sync-Dashboard</h1>
+            <p className="hero-copy">
+              Melde dich mit dem lokalen Admin-Benutzer an, um Sync-Paare,
+              Run-Historie und spaetere rclone-Steuerung zu verwalten.
+            </p>
+          </div>
+        </section>
+
+        <section className="panel auth-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Login</p>
+              <h2>Zugangsdaten</h2>
+            </div>
+          </div>
+
+          {error ? <p className="state error">Fehler: {error}</p> : null}
+
+          <form className="sync-form" onSubmit={handleLogin}>
+            <label>
+              <span>Benutzername</span>
+              <input
+                required
+                value={loginState.username}
+                onChange={(event) =>
+                  setLoginState((current) => ({ ...current, username: event.target.value }))
+                }
+              />
+            </label>
+
+            <label>
+              <span>Passwort</span>
+              <input
+                required
+                type="password"
+                value={loginState.password}
+                onChange={(event) =>
+                  setLoginState((current) => ({ ...current, password: event.target.value }))
+                }
+              />
+            </label>
+
+            <button className="primary-button" type="submit" disabled={loginSubmitting}>
+              {loginSubmitting ? "Melde an..." : "Anmelden"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="page-shell">
       <section className="hero">
@@ -185,14 +347,19 @@ export function App() {
           <p className="eyebrow">PCloud Sync Docker App</p>
           <h1>Sync-Dashboard fuer NAS und pCloud</h1>
           <p className="hero-copy">
-            Der Prototyp laedt erste Sync-Paare aus dem FastAPI-Backend und
-            bildet die Grundstruktur fuer Dashboard, Monitoring und spaetere
-            Steuerung.
+            Angemeldet als <strong>{currentUser.username}</strong>. Das Dashboard
+            zeigt geschuetzte Sync-Paare, Run-Historie und den manuellen
+            Trigger fuer erste rclone-Laeufe.
           </p>
         </div>
-        <div className="hero-stat">
-          <span>Sync-Paare</span>
-          <strong>{syncPairs.length}</strong>
+        <div className="hero-actions">
+          <div className="hero-stat">
+            <span>Sync-Paare</span>
+            <strong>{syncPairs.length}</strong>
+          </div>
+          <button className="table-button logout-button" type="button" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </section>
 
@@ -389,8 +556,8 @@ export function App() {
                     <dd>{run.duration_seconds}s</dd>
                   </div>
                   <div>
-                    <dt>Fehler</dt>
-                    <dd>{run.error_count}</dd>
+                    <dt>Exit-Code</dt>
+                    <dd>{run.exit_code ?? "-"}</dd>
                   </div>
                 </dl>
               </article>
