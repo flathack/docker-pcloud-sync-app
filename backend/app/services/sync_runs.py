@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.sync_pair import SyncPair
 from app.models.sync_run import SyncRun
 from app.runners.rclone_runner import run_sync_pair
+from app.services import settings as settings_service
 from app.services.sync_pairs import calculate_next_run
 
 
@@ -75,4 +76,17 @@ def start_sync_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual
     db.add(sync_pair)
     db.commit()
     db.refresh(run)
+
+    telegram_result = settings_service.send_sync_notification(
+        sync_pair.name,
+        run.status,
+        run.short_log,
+        run.report,
+    )
+    if not telegram_result.ok:
+        run.report = f"{run.report}\n\nTelegram-Versand fehlgeschlagen: {telegram_result.detail}"
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+
     return run

@@ -12,6 +12,12 @@ from app.schemas.auth import (
 )
 from app.schemas.browser import BrowserCreateDirectoryRequest, BrowserResponse
 from app.schemas.settings import RcloneConfigStatus, RcloneConfigTestRequest, RcloneConfigTestResult
+from app.schemas.settings import (
+    TelegramSettingsStatus,
+    TelegramSettingsUpdateRequest,
+    TelegramTestRequest,
+    TelegramTestResult,
+)
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
 from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
 from app.services import auth as auth_service
@@ -305,3 +311,32 @@ def test_rclone_config(
     current_user: UserSummary = Depends(require_current_user),
 ) -> RcloneConfigTestResult:
     return settings_service.test_rclone_remote(payload.remote_name)
+
+
+@router.get("/settings/telegram", response_model=TelegramSettingsStatus)
+def get_telegram_settings(
+    current_user: UserSummary = Depends(require_current_user),
+) -> TelegramSettingsStatus:
+    return settings_service.get_telegram_settings_status()
+
+
+@router.put("/settings/telegram", response_model=TelegramSettingsStatus)
+def save_telegram_settings(
+    payload: TelegramSettingsUpdateRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> TelegramSettingsStatus:
+    return settings_service.save_telegram_settings(
+        enabled=payload.enabled,
+        bot_token=payload.bot_token,
+        chat_id=payload.chat_id,
+        notify_on_success=payload.notify_on_success,
+        notify_on_error=payload.notify_on_error,
+    )
+
+
+@router.post("/settings/test-telegram", response_model=TelegramTestResult)
+def test_telegram_settings(
+    payload: TelegramTestRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> TelegramTestResult:
+    return settings_service.test_telegram(payload.message)

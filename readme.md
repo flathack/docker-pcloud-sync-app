@@ -579,6 +579,8 @@ RCLONE_GLOBAL_FLAGS=--use-json-log --log-level INFO --stats 10s --stats-one-line
 TELEGRAM_ENABLED=false
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
+TELEGRAM_NOTIFY_ON_SUCCESS=false
+TELEGRAM_NOTIFY_ON_ERROR=true
 ```
 
 ### Persistenz

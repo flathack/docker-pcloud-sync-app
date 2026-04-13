@@ -57,6 +57,15 @@ type RcloneConfigStatus = {
   detail: string;
 };
 type RcloneConfigTestResult = { ok: boolean; remote_name: string | null; detail: string };
+type TelegramSettingsStatus = {
+  enabled: boolean;
+  bot_token_configured: boolean;
+  chat_id: string | null;
+  notify_on_success: boolean;
+  notify_on_error: boolean;
+  detail: string;
+};
+type TelegramTestResult = { ok: boolean; detail: string };
 type RunLogResponse = { log: string };
 type UserAdminSummary = { username: string; role: string; is_active: boolean; created_at: string };
 type BrowserField = "source_path" | "destination_path" | null;
@@ -88,6 +97,13 @@ const initialFormState = {
 const initialLoginState = { username: "admin", password: "change-me-now" };
 const initialUserFormState = { username: "", password: "", role: "admin", is_active: true };
 const initialPasswordResetState = { username: "", password: "" };
+const initialTelegramFormState = {
+  enabled: false,
+  bot_token: "",
+  chat_id: "",
+  notify_on_success: false,
+  notify_on_error: true,
+};
 
 async function apiFetch(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
@@ -164,6 +180,11 @@ export function App() {
   const [uploadingConfig, setUploadingConfig] = useState(false);
   const [selectedConfigFile, setSelectedConfigFile] = useState<File | null>(null);
   const [testResult, setTestResult] = useState<RcloneConfigTestResult | null>(null);
+  const [telegramStatus, setTelegramStatus] = useState<TelegramSettingsStatus | null>(null);
+  const [telegramFormState, setTelegramFormState] = useState(initialTelegramFormState);
+  const [telegramSaving, setTelegramSaving] = useState(false);
+  const [telegramTesting, setTelegramTesting] = useState(false);
+  const [telegramTestResult, setTelegramTestResult] = useState<TelegramTestResult | null>(null);
   const [userLoading, setUserLoading] = useState(false);
   const [userSubmitting, setUserSubmitting] = useState(false);
   const [userFormState, setUserFormState] = useState(initialUserFormState);
@@ -270,6 +291,24 @@ export function App() {
     }
   }
 
+  async function loadTelegramStatus() {
+    try {
+      const response = await apiFetch("/settings/telegram", { method: "GET" });
+      if (!response.ok) throw new Error(`Telegram-Status antwortet mit Status ${response.status}`);
+      const data = (await response.json()) as TelegramSettingsStatus;
+      setTelegramStatus(data);
+      setTelegramFormState((current) => ({
+        ...current,
+        enabled: data.enabled,
+        chat_id: data.chat_id ?? "",
+        notify_on_success: data.notify_on_success,
+        notify_on_error: data.notify_on_error,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    }
+  }
+
   async function loadBrowser(path: string | null, mode: BrowserMode) {
     try {
       setBrowserLoading(true);
@@ -344,6 +383,7 @@ export function App() {
     }
     void loadDashboardData();
     if (currentUser.role === "admin") void loadUsers();
+    void loadTelegramStatus();
   }, [currentUser]);
 
   useEffect(() => {
@@ -504,6 +544,43 @@ export function App() {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
       setTestLoading(false);
+    }
+  }
+
+  async function handleTelegramSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      setTelegramSaving(true);
+      const response = await apiFetch("/settings/telegram", {
+        method: "PUT",
+        body: JSON.stringify(telegramFormState),
+      });
+      if (!response.ok) throw new Error(`Telegram speichern fehlgeschlagen mit Status ${response.status}`);
+      const data = (await response.json()) as TelegramSettingsStatus;
+      setTelegramStatus(data);
+      setTelegramFormState((current) => ({ ...current, bot_token: "" }));
+      setTelegramTestResult(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setTelegramSaving(false);
+    }
+  }
+
+  async function handleTelegramTest() {
+    try {
+      setTelegramTesting(true);
+      const response = await apiFetch("/settings/test-telegram", {
+        method: "POST",
+        body: JSON.stringify({ message: "Testnachricht aus dem pcloud-sync-app Settings-Bereich." }),
+      });
+      if (!response.ok) throw new Error(`Telegram-Test fehlgeschlagen mit Status ${response.status}`);
+      setTelegramTestResult((await response.json()) as TelegramTestResult);
+      await loadTelegramStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setTelegramTesting(false);
     }
   }
 
@@ -901,6 +978,40 @@ export function App() {
                 <span className="settings-note">{rcloneStatus?.remotes.length ? `Testet standardmaessig ${rcloneStatus.remotes[0]}` : "Zuerst eine gueltige rclone.conf hochladen"}</span>
               </div>
               {testResult ? <p className={`state ${testResult.ok ? "" : "error"}`}>{testResult.detail}</p> : null}
+            </section>
+
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Telegram</p><h2>Benachrichtigungen</h2></div><button className="table-button" type="button" onClick={() => void loadTelegramStatus()}>Aktualisieren</button></div>
+              {telegramStatus ? (
+                <>
+                  <div className="settings-grid">
+                    <article className="settings-card"><span className={`badge ${telegramStatus.enabled ? "idle" : "running"}`}>{telegramStatus.enabled ? "aktiv" : "inaktiv"}</span><h3>Modulstatus</h3><p>{telegramStatus.detail}</p></article>
+                    <article className="settings-card"><span className={`badge ${telegramStatus.bot_token_configured ? "idle" : "error"}`}>{telegramStatus.bot_token_configured ? "konfiguriert" : "fehlt"}</span><h3>Bot und Chat</h3><p>{telegramStatus.chat_id ? `Chat-ID: ${telegramStatus.chat_id}` : "Noch keine Chat-ID gespeichert"}</p></article>
+                    <article className="settings-card"><span className="badge idle">Trigger</span><h3>Versandregeln</h3><p>Erfolg: {telegramStatus.notify_on_success ? "ja" : "nein"}</p><p>Fehler: {telegramStatus.notify_on_error ? "ja" : "nein"}</p></article>
+                  </div>
+                </>
+              ) : null}
+            </section>
+
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Telegram Setup</p><h2>Bot verbinden</h2></div></div>
+              <form className="settings-form" onSubmit={handleTelegramSave}>
+                <label className="schedule-toggle"><span>Telegram aktivieren</span><input type="checkbox" checked={telegramFormState.enabled} onChange={(event) => setTelegramFormState((current) => ({ ...current, enabled: event.target.checked }))} /></label>
+                <label><span>Bot Token</span><input type="password" placeholder={telegramStatus?.bot_token_configured ? "Bereits gespeichert, nur fuer Aenderung neu eingeben" : "123456:ABC..."} value={telegramFormState.bot_token} onChange={(event) => setTelegramFormState((current) => ({ ...current, bot_token: event.target.value }))} /></label>
+                <label><span>Chat-ID</span><input value={telegramFormState.chat_id} onChange={(event) => setTelegramFormState((current) => ({ ...current, chat_id: event.target.value }))} /></label>
+                <label className="schedule-toggle"><span>Bei Erfolg senden</span><input type="checkbox" checked={telegramFormState.notify_on_success} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_success: event.target.checked }))} /></label>
+                <label className="schedule-toggle"><span>Bei Fehler senden</span><input type="checkbox" checked={telegramFormState.notify_on_error} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_error: event.target.checked }))} /></label>
+                <button className="primary-button" type="submit" disabled={telegramSaving}>{telegramSaving ? "Speichere..." : "Telegram speichern"}</button>
+              </form>
+            </section>
+
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Telegram Test</p><h2>Testnachricht senden</h2></div></div>
+              <div className="inline-actions">
+                <button className="primary-button" type="button" disabled={telegramTesting || !telegramStatus?.bot_token_configured} onClick={() => void handleTelegramTest()}>{telegramTesting ? "Sende..." : "Testnachricht senden"}</button>
+                <span className="settings-note">{telegramStatus?.bot_token_configured ? "Sendet eine kurze Testnachricht an den konfigurierten Chat." : "Zuerst Token und Chat-ID speichern"}</span>
+              </div>
+              {telegramTestResult ? <p className={`state ${telegramTestResult.ok ? "" : "error"}`}>{telegramTestResult.detail}</p> : null}
             </section>
           </>
         )}
