@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import inspect, text
 
 from app.api.routes import router
@@ -10,8 +12,17 @@ from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.models.sync_pair import SyncPair
 from app.models.sync_run import SyncRun
+from app.models.user import User
+from app.services.auth import create_admin_user
 
 app = FastAPI(title="PCloud Sync Docker App", version="0.1.0")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("APP_SECRET_KEY", "please-change-me"),
+    same_site="lax",
+    https_only=False,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,6 +72,17 @@ def seed_sync_pairs() -> None:
         db.close()
 
 
+def seed_admin_user() -> None:
+    db = SessionLocal()
+    try:
+        username = os.getenv("ADMIN_USERNAME", "admin")
+        password = os.getenv("ADMIN_PASSWORD", "change-me-now")
+        if db.get(User, username) is None:
+            create_admin_user(db, username, password)
+    finally:
+        db.close()
+
+
 def ensure_dev_schema() -> None:
     inspector = inspect(engine)
     if "sync_runs" not in inspector.get_table_names():
@@ -83,4 +105,5 @@ def ensure_dev_schema() -> None:
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_dev_schema()
+    seed_admin_user()
     seed_sync_pairs()
