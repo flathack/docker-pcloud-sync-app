@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.sync_pair import SyncPair
 from app.models.sync_run import SyncRun
+from app.runners.rclone_runner import run_sync_pair
 
 
 def list_runs_for_sync_pair(db: Session, sync_pair_id: str) -> list[SyncRun]:
@@ -16,26 +15,28 @@ def list_runs_for_sync_pair(db: Session, sync_pair_id: str) -> list[SyncRun]:
     return list(db.scalars(statement))
 
 
-def start_demo_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual") -> SyncRun:
-    started_at = datetime.now(timezone.utc)
-    finished_at = datetime.now(timezone.utc)
+def start_sync_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual") -> SyncRun:
+    result = run_sync_pair(sync_pair)
 
     run = SyncRun(
         sync_pair_id=sync_pair.id,
         trigger_type=trigger_type,
-        status="success",
-        started_at=started_at,
-        finished_at=finished_at,
-        duration_seconds=1,
-        files_transferred=12,
-        files_deleted=0,
-        error_count=0,
-        bytes_transferred=1048576,
-        short_log="Demo-Lauf erfolgreich abgeschlossen.",
+        status=result.status,
+        started_at=result.started_at,
+        finished_at=result.finished_at,
+        duration_seconds=result.duration_seconds,
+        files_transferred=result.files_transferred,
+        files_deleted=result.files_deleted,
+        error_count=result.error_count,
+        bytes_transferred=result.bytes_transferred,
+        exit_code=result.exit_code,
+        short_log=result.short_log,
+        full_log_path=result.full_log_path,
+        rclone_command=result.command,
     )
 
-    sync_pair.status = "idle"
-    sync_pair.last_status = "success"
+    sync_pair.status = "idle" if result.status == "success" else "error"
+    sync_pair.last_status = result.status
 
     db.add(run)
     db.add(sync_pair)

@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 
 from app.api.routes import router
 from app.db.base import Base
@@ -60,7 +61,26 @@ def seed_sync_pairs() -> None:
         db.close()
 
 
+def ensure_dev_schema() -> None:
+    inspector = inspect(engine)
+    if "sync_runs" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("sync_runs")}
+    required_columns = {
+        "exit_code": "ALTER TABLE sync_runs ADD COLUMN exit_code INTEGER",
+        "full_log_path": "ALTER TABLE sync_runs ADD COLUMN full_log_path TEXT",
+        "rclone_command": "ALTER TABLE sync_runs ADD COLUMN rclone_command TEXT NOT NULL DEFAULT ''",
+    }
+
+    with engine.begin() as connection:
+        for column_name, statement in required_columns.items():
+            if column_name not in existing_columns:
+                connection.execute(text(statement))
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_dev_schema()
     seed_sync_pairs()

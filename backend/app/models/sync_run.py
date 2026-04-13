@@ -25,7 +25,10 @@ class SyncRun(Base):
     files_deleted: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     bytes_transferred: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     short_log: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    full_log_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rclone_command: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
 
     sync_pair = relationship("SyncPair", back_populates="runs")

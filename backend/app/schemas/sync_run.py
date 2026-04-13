@@ -17,7 +17,10 @@ class SyncRunSummary(BaseModel):
     files_deleted: int
     error_count: int
     bytes_transferred: int
+    exit_code: int | None
     short_log: str
+    full_log_path: str | None
+    rclone_command: str
     created_at: datetime
 
 
