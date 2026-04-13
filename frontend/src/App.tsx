@@ -58,9 +58,10 @@ type RcloneConfigStatus = {
 };
 type RcloneConfigTestResult = { ok: boolean; remote_name: string | null; detail: string };
 type RunLogResponse = { log: string };
+type UserAdminSummary = { username: string; role: string; is_active: boolean; created_at: string };
 type BrowserField = "source_path" | "destination_path" | null;
 type BrowserMode = "local" | "remote";
-type AppSection = "dashboard" | "settings";
+type AppSection = "dashboard" | "users" | "settings";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 const weekdayOptions = [
@@ -85,6 +86,8 @@ const initialFormState = {
   schedule_weekday: 0,
 };
 const initialLoginState = { username: "admin", password: "change-me-now" };
+const initialUserFormState = { username: "", password: "", role: "admin", is_active: true };
+const initialPasswordResetState = { username: "", password: "" };
 
 async function apiFetch(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
@@ -127,6 +130,7 @@ export function App() {
   const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [loginState, setLoginState] = useState(initialLoginState);
   const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
+  const [users, setUsers] = useState<UserAdminSummary[]>([]);
   const [syncPairs, setSyncPairs] = useState<SyncPairSummary[]>([]);
   const [recentRuns, setRecentRuns] = useState<SyncRunSummary[]>([]);
   const [runs, setRuns] = useState<SyncRunSummary[]>([]);
@@ -160,6 +164,10 @@ export function App() {
   const [uploadingConfig, setUploadingConfig] = useState(false);
   const [selectedConfigFile, setSelectedConfigFile] = useState<File | null>(null);
   const [testResult, setTestResult] = useState<RcloneConfigTestResult | null>(null);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userSubmitting, setUserSubmitting] = useState(false);
+  const [userFormState, setUserFormState] = useState(initialUserFormState);
+  const [passwordResetState, setPasswordResetState] = useState(initialPasswordResetState);
 
   const selectedSyncPair = syncPairs.find((pair) => pair.id === selectedSyncPairId) ?? null;
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
@@ -203,6 +211,20 @@ export function App() {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
       setDashboardLoading(false);
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      setUserLoading(true);
+      const response = await apiFetch("/users", { method: "GET" });
+      if (response.status === 403) return void setUsers([]);
+      if (!response.ok) throw new Error(`Benutzer laden fehlgeschlagen mit Status ${response.status}`);
+      setUsers((await response.json()) as UserAdminSummary[]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setUserLoading(false);
     }
   }
 
@@ -310,6 +332,7 @@ export function App() {
 
   useEffect(() => {
     if (!currentUser) {
+      setUsers([]);
       setSyncPairs([]);
       setRecentRuns([]);
       setRuns([]);
@@ -320,6 +343,7 @@ export function App() {
       return;
     }
     void loadDashboardData();
+    if (currentUser.role === "admin") void loadUsers();
   }, [currentUser]);
 
   useEffect(() => {
@@ -483,6 +507,65 @@ export function App() {
     }
   }
 
+  async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      setUserSubmitting(true);
+      const response = await apiFetch("/users", {
+        method: "POST",
+        body: JSON.stringify(userFormState),
+      });
+      if (!response.ok) throw new Error(`Benutzer anlegen fehlgeschlagen mit Status ${response.status}`);
+      setUserFormState(initialUserFormState);
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setUserSubmitting(false);
+    }
+  }
+
+  async function handleToggleUserActive(user: UserAdminSummary) {
+    try {
+      const response = await apiFetch(`/users/${encodeURIComponent(user.username)}`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: !user.is_active }),
+      });
+      if (!response.ok) throw new Error(`Benutzerstatus speichern fehlgeschlagen mit Status ${response.status}`);
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    }
+  }
+
+  async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      setUserSubmitting(true);
+      const response = await apiFetch(`/users/${encodeURIComponent(passwordResetState.username)}/password`, {
+        method: "PUT",
+        body: JSON.stringify({ password: passwordResetState.password }),
+      });
+      if (!response.ok) throw new Error(`Passwort-Reset fehlgeschlagen mit Status ${response.status}`);
+      setPasswordResetState(initialPasswordResetState);
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setUserSubmitting(false);
+    }
+  }
+
+  async function handleDeleteUser(username: string) {
+    try {
+      const response = await apiFetch(`/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(`Benutzer loeschen fehlgeschlagen mit Status ${response.status}`);
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    }
+  }
+
   if (sessionLoading) {
     return <main className="page-shell"><section className="panel"><p className="state">Pruefe Anmeldung...</p></section></main>;
   }
@@ -513,16 +596,45 @@ export function App() {
   return (
     <main className="app-layout">
       <aside className="sidebar">
-        <div>
-          <p className="eyebrow">PCloud Sync</p>
-          <h1 className="sidebar-title">Admin</h1>
-          <p className="sidebar-copy">Angemeldet als {currentUser.username}</p>
+        <div className="sidebar-top">
+          <div className="sidebar-brand">
+            <div className="sidebar-brand-mark">PS</div>
+            <div>
+              <p className="sidebar-brand-title">pcloud-sync-app</p>
+              <p className="sidebar-brand-subtitle">Container Edition</p>
+            </div>
+          </div>
+          <div className="sidebar-home-link">Home</div>
         </div>
-        <nav className="sidebar-nav">
-          <button className={`sidebar-link ${activeSection === "dashboard" ? "active" : ""}`} type="button" onClick={() => setActiveSection("dashboard")}>Dashboard</button>
-          <button className={`sidebar-link ${activeSection === "settings" ? "active" : ""}`} type="button" onClick={() => setActiveSection("settings")}>Settings</button>
-        </nav>
-        <button className="table-button logout-button" type="button" onClick={handleLogout}>Logout</button>
+
+        <div className="sidebar-middle">
+          <section className="sidebar-cluster">
+            <div className="sidebar-cluster-head">
+              <span className="sidebar-cluster-title">ALPHA-DOCKER</span>
+            </div>
+            <nav className="sidebar-nav sidebar-card-nav">
+              <button className={`sidebar-link ${activeSection === "dashboard" ? "active" : ""}`} type="button" onClick={() => setActiveSection("dashboard")}>Dashboard</button>
+              {currentUser.role === "admin" ? <button className={`sidebar-link ${activeSection === "users" ? "active" : ""}`} type="button" onClick={() => setActiveSection("users")}>Users</button> : null}
+              <button className={`sidebar-link ${activeSection === "settings" ? "active" : ""}`} type="button" onClick={() => setActiveSection("settings")}>Settings</button>
+            </nav>
+          </section>
+
+          <section className="sidebar-meta">
+            <p className="sidebar-section-label">Session</p>
+            <div className="sidebar-user-card">
+              <p className="sidebar-user-name">{currentUser.username}</p>
+              <p className="sidebar-copy">Angemeldet und aktiv</p>
+            </div>
+          </section>
+        </div>
+
+        <div className="sidebar-bottom">
+          <div className="sidebar-version-card">
+            <strong>Sync Center</strong>
+            <p>Reports, Zeitplaene und Browser im Portainer-Stil.</p>
+          </div>
+          <button className="table-button logout-button" type="button" onClick={handleLogout}>Logout</button>
+        </div>
       </aside>
 
       <div className="content-shell">
@@ -687,6 +799,63 @@ export function App() {
                       {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfuegbar."}</pre>}
                     </article>
                   </>
+                ) : null}
+              </section>
+            </section>
+          </>
+        ) : activeSection === "users" && currentUser.role === "admin" ? (
+          <>
+            <section className="hero">
+              <div>
+                <p className="eyebrow">Users</p>
+                <h1>Benutzerverwaltung</h1>
+                <p className="hero-copy">Hier verwaltest du lokale Benutzerkonten fuer Anmeldung und Administration.</p>
+              </div>
+            </section>
+
+            {error ? <p className="state error">Fehler: {error}</p> : null}
+
+            <section className="dashboard-split">
+              <section className="panel">
+                <div className="panel-header"><div><p className="eyebrow">Anlegen</p><h2>Neuen Benutzer erstellen</h2></div></div>
+                <form className="sync-form compact-form" onSubmit={handleCreateUser}>
+                  <label><span>Benutzername</span><input required value={userFormState.username} onChange={(event) => setUserFormState((current) => ({ ...current, username: event.target.value }))} /></label>
+                  <label><span>Passwort</span><input required minLength={8} type="password" value={userFormState.password} onChange={(event) => setUserFormState((current) => ({ ...current, password: event.target.value }))} /></label>
+                  <label><span>Rolle</span><select value={userFormState.role} onChange={(event) => setUserFormState((current) => ({ ...current, role: event.target.value }))}><option value="admin">admin</option></select></label>
+                  <label className="schedule-toggle"><span>Aktiv</span><input type="checkbox" checked={userFormState.is_active} onChange={(event) => setUserFormState((current) => ({ ...current, is_active: event.target.checked }))} /></label>
+                  <button className="primary-button" type="submit" disabled={userSubmitting}>{userSubmitting ? "Speichere..." : "Benutzer anlegen"}</button>
+                </form>
+              </section>
+
+              <section className="panel">
+                <div className="panel-header"><div><p className="eyebrow">Passwort</p><h2>Passwort zuruecksetzen</h2></div></div>
+                <form className="sync-form compact-form" onSubmit={handleResetPassword}>
+                  <label><span>Benutzer</span><select required value={passwordResetState.username} onChange={(event) => setPasswordResetState((current) => ({ ...current, username: event.target.value }))}><option value="">Bitte waehlen</option>{users.map((user) => <option key={user.username} value={user.username}>{user.username}</option>)}</select></label>
+                  <label><span>Neues Passwort</span><input required minLength={8} type="password" value={passwordResetState.password} onChange={(event) => setPasswordResetState((current) => ({ ...current, password: event.target.value }))} /></label>
+                  <button className="primary-button" type="submit" disabled={userSubmitting}>{userSubmitting ? "Speichere..." : "Passwort setzen"}</button>
+                </form>
+              </section>
+
+              <section className="panel report-panel">
+                <div className="panel-header"><div><p className="eyebrow">Benutzer</p><h2>Vorhandene Accounts</h2></div><button className="table-button" type="button" onClick={() => void loadUsers()}>Aktualisieren</button></div>
+                {userLoading ? <p className="state">Lade Benutzer...</p> : null}
+                {!userLoading ? (
+                  <div className="run-list">
+                    {users.map((user) => (
+                      <article className="run-card" key={user.username}>
+                        <div className="run-card-header">
+                          <strong>{user.username}</strong>
+                          <span className={`badge ${user.is_active ? "idle" : "error"}`}>{user.is_active ? "aktiv" : "deaktiviert"}</span>
+                        </div>
+                        <p>Rolle: {user.role}</p>
+                        <p>Angelegt: {formatDateTime(user.created_at)}</p>
+                        <div className="action-stack">
+                          <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleToggleUserActive(user)}>{user.is_active ? "Deaktivieren" : "Aktivieren"}</button>
+                          <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleDeleteUser(user.username)}>Loeschen</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 ) : null}
               </section>
             </section>

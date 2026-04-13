@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_current_user
+from app.api.deps import require_admin_user, require_current_user
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, UserSummary
+from app.schemas.auth import (
+    LoginRequest,
+    UserCreateRequest,
+    UserPasswordUpdateRequest,
+    UserSummary,
+    UserUpdateRequest,
+)
 from app.schemas.browser import BrowserCreateDirectoryRequest, BrowserResponse
 from app.schemas.settings import RcloneConfigStatus, RcloneConfigTestRequest, RcloneConfigTestResult
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
@@ -76,6 +82,78 @@ def logout(request: Request) -> Response:
 @router.get("/auth/me", response_model=UserSummary)
 def auth_me(current_user: UserSummary = Depends(require_current_user)) -> UserSummary:
     return current_user
+
+
+@router.get("/users", response_model=list[UserSummary])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> list[UserSummary]:
+    return auth_service.list_users(db)
+
+
+@router.post("/users", response_model=UserSummary, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: UserCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> UserSummary:
+    try:
+        return auth_service.create_user(
+            db,
+            payload.username,
+            payload.password,
+            role=payload.role,
+            is_active=payload.is_active,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/users/{username}", response_model=UserSummary)
+def update_user(
+    username: str,
+    payload: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> UserSummary:
+    user = auth_service.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
+    if current_user.username == username and payload.is_active is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Eigener Benutzer kann nicht deaktiviert werden")
+    return auth_service.update_user(db, user, role=payload.role, is_active=payload.is_active)
+
+
+@router.put("/users/{username}/password", response_model=UserSummary)
+def update_user_password(
+    username: str,
+    payload: UserPasswordUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> UserSummary:
+    user = auth_service.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
+    try:
+        return auth_service.update_user_password(db, user, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/users/{username}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> Response:
+    user = auth_service.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
+    if current_user.username == username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Eigener Benutzer kann nicht geloescht werden")
+    auth_service.delete_user(db, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/sync-pairs", response_model=list[SyncPairSummary])

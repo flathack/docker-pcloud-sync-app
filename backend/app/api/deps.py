@@ -16,3 +16,9 @@ def require_current_user(request: Request, db: Session = Depends(get_db)) -> Use
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sitzung ungueltig")
 
     return user
+
+
+def require_admin_user(current_user: User = Depends(require_current_user)) -> User:
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin-Rechte erforderlich")
+    return current_user
