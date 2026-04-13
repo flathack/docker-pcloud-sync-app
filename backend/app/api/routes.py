@@ -157,7 +157,7 @@ def delete_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
     if current_user.username == username:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Eigener Benutzer kann nicht geloescht werden")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Eigener Benutzer kann nicht gelöscht werden")
     auth_service.delete_user(db, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

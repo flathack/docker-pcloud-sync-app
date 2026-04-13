@@ -132,12 +132,12 @@ function formatDateTime(value: string | null) {
 function describeSchedule(pair: Pick<SyncPairSummary, "schedule_enabled" | "schedule_type" | "schedule_interval_minutes" | "schedule_time" | "schedule_weekday">) {
   if (!pair.schedule_enabled) return "Nur manuell";
   if (pair.schedule_type === "interval") return `Alle ${pair.schedule_interval_minutes} Minuten`;
-  if (pair.schedule_type === "hourly") return `Stuendlich um Minute ${pair.schedule_time?.split(":")[1] ?? "00"}`;
+  if (pair.schedule_type === "hourly") return `Stündlich um Minute ${pair.schedule_time?.split(":")[1] ?? "00"}`;
   if (pair.schedule_type === "weekly") {
     const weekday = weekdayOptions.find((item) => item.value === pair.schedule_weekday)?.label ?? "Montag";
-    return `Woechentlich ${weekday}, ${pair.schedule_time ?? "00:00"} Uhr`;
+    return `Wöchentlich ${weekday}, ${pair.schedule_time ?? "00:00"} Uhr`;
   }
-  return `Taeglich um ${pair.schedule_time ?? "00:00"} Uhr`;
+  return `Täglich um ${pair.schedule_time ?? "00:00"} Uhr`;
 }
 
 export function App() {
@@ -200,7 +200,7 @@ export function App() {
     try {
       const response = await apiFetch("/auth/me", { method: "GET" });
       if (response.status === 401) return void setCurrentUser(null);
-      if (!response.ok) throw new Error(`Session-Pruefung fehlgeschlagen mit Status ${response.status}`);
+      if (!response.ok) throw new Error(`Session-Prüfung fehlgeschlagen mit Status ${response.status}`);
       setCurrentUser((await response.json()) as UserSummary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -416,7 +416,7 @@ export function App() {
     setError(null);
     try {
       const response = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify(loginState) });
-      if (!response.ok) throw new Error("Login fehlgeschlagen. Bitte Zugangsdaten pruefen.");
+      if (!response.ok) throw new Error("Login fehlgeschlagen. Bitte Zugangsdaten prüfen.");
       setCurrentUser((await response.json()) as UserSummary);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -458,7 +458,7 @@ export function App() {
   async function handleDeleteSyncPair(id: string) {
     try {
       const response = await apiFetch(`/sync-pairs/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error(`Loeschen fehlgeschlagen mit Status ${response.status}`);
+      if (!response.ok) throw new Error(`Löschen fehlgeschlagen mit Status ${response.status}`);
       setSelectedSyncPairId((current) => (current === id ? null : current));
       await loadDashboardData();
     } catch (err) {
@@ -509,7 +509,7 @@ export function App() {
 
   async function handleRcloneUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedConfigFile) return void setError("Bitte zuerst eine rclone.conf auswaehlen.");
+    if (!selectedConfigFile) return void setError("Bitte zuerst eine rclone.conf auswählen.");
     try {
       setUploadingConfig(true);
       const formData = new FormData();
@@ -636,7 +636,7 @@ export function App() {
   async function handleDeleteUser(username: string) {
     try {
       const response = await apiFetch(`/users/${encodeURIComponent(username)}`, { method: "DELETE" });
-      if (!response.ok) throw new Error(`Benutzer loeschen fehlgeschlagen mit Status ${response.status}`);
+      if (!response.ok) throw new Error(`Benutzer löschen fehlgeschlagen mit Status ${response.status}`);
       await loadUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -644,7 +644,7 @@ export function App() {
   }
 
   if (sessionLoading) {
-    return <main className="page-shell"><section className="panel"><p className="state">Pruefe Anmeldung...</p></section></main>;
+    return <main className="page-shell"><section className="panel"><p className="state">Prüfe Anmeldung...</p></section></main>;
   }
 
   if (!currentUser) {
@@ -653,8 +653,8 @@ export function App() {
         <section className="hero auth-hero">
           <div>
             <p className="eyebrow">PCloud Sync Docker App</p>
-            <h1>Anmeldung fuer das Sync-Dashboard</h1>
-            <p className="hero-copy">Melde dich mit dem lokalen Admin-Benutzer an, um Sync-Paare, Reports und Zeitplaene zu verwalten.</p>
+            <h1>Anmeldung für das Sync-Dashboard</h1>
+            <p className="hero-copy">Melde dich mit dem lokalen Admin-Benutzer an, um Sync-Paare, Reports und Zeitpläne zu verwalten.</p>
           </div>
         </section>
         <section className="panel auth-panel">
@@ -721,17 +721,17 @@ export function App() {
               <div>
                 <p className="eyebrow">Dashboard</p>
                 <h1>Sync-Zentrale fuer NAS und pCloud</h1>
-                <p className="hero-copy">Hier siehst du, was zuletzt passiert ist, planst automatische Laeufe und oeffnest Berichte pro Sync.</p>
+                <p className="hero-copy">Hier siehst du, was zuletzt passiert ist, planst automatische Läufe und öffnest Berichte pro Sync.</p>
                 {!rcloneStatus?.exists ? <p className="state error">rclone ist noch nicht konfiguriert. Richte die Verbindung in den Settings ein.</p> : null}
               </div>
               <div className="hero-actions">
-                <button className="primary-button" type="button" onClick={() => setCreateOpen((current) => !current)}>{createOpen ? "Dialog schliessen" : "Neuen Sync anlegen"}</button>
+                <button className="primary-button" type="button" onClick={() => setCreateOpen((current) => !current)}>{createOpen ? "Dialog schließen" : "Neuen Sync anlegen"}</button>
               </div>
             </section>
 
             <section className="stats-grid">
               <article className="stat-card accent-blue"><span>Sync-Paare</span><strong>{syncPairs.length}</strong><p>Aktive Verbindungen im System</p></article>
-              <article className="stat-card accent-gold"><span>Erfolgreiche Laeufe</span><strong>{successfulRuns}</strong><p>Aus den letzten {recentRuns.length} Runs</p></article>
+              <article className="stat-card accent-gold"><span>Erfolgreiche Läufe</span><strong>{successfulRuns}</strong><p>Aus den letzten {recentRuns.length} Runs</p></article>
               <article className="stat-card accent-green"><span>Transfer-Volumen</span><strong>{formatBytes(totalBytes)}</strong><p>Gesamt ueber die letzte Run-Serie</p></article>
               <article className="stat-card accent-slate"><span>Dateien bewegt</span><strong>{totalFiles}</strong><p>Transferierte Dateien aus Reports</p></article>
             </section>
@@ -746,7 +746,7 @@ export function App() {
                     <span>Quelle</span>
                     <div className="path-input-row">
                       <input required value={formState.source_path} onChange={(event) => setFormState((current) => ({ ...current, source_path: event.target.value }))} />
-                      <button className="table-button" type="button" onClick={() => openBrowser("source_path", "local")}>Ordner waehlen</button>
+                      <button className="table-button" type="button" onClick={() => openBrowser("source_path", "local")}>Ordner wählen</button>
                     </div>
                   </label>
                   <label className="path-field">
@@ -761,7 +761,7 @@ export function App() {
                   </label>
                   <label><span>Richtung</span><select value={formState.direction} onChange={(event) => setFormState((current) => ({ ...current, direction: event.target.value }))}><option value="push">push</option><option value="pull">pull</option><option value="bidirectional">bidirectional</option></select></label>
                   <label className="schedule-toggle"><span>Zeitplan aktiv</span><input type="checkbox" checked={formState.schedule_enabled} onChange={(event) => setFormState((current) => ({ ...current, schedule_enabled: event.target.checked }))} /></label>
-                  <label><span>Intervall</span><select value={formState.schedule_type} onChange={(event) => setFormState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Taeglich</option><option value="weekly">Woechentlich</option><option value="hourly">Stuendlich</option><option value="interval">Alle X Minuten</option></select></label>
+                  <label><span>Intervall</span><select value={formState.schedule_type} onChange={(event) => setFormState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="hourly">Stündlich</option><option value="interval">Alle X Minuten</option></select></label>
                   {formState.schedule_type === "interval" ? (
                     <label><span>Minuten</span><input min={5} step={5} type="number" value={formState.schedule_interval_minutes} onChange={(event) => setFormState((current) => ({ ...current, schedule_interval_minutes: Number(event.target.value) }))} /></label>
                   ) : (
@@ -778,7 +778,7 @@ export function App() {
             {error ? <p className="state error">Fehler: {error}</p> : null}
 
             <section className="panel dashboard-panel">
-              <div className="panel-header"><div><p className="eyebrow">Uebersicht</p><h2>Deine Syncs</h2></div></div>
+              <div className="panel-header"><div><p className="eyebrow">Übersicht</p><h2>Deine Syncs</h2></div></div>
               {dashboardLoading ? <p className="state">Lade Dashboard...</p> : null}
               {!dashboardLoading ? (
                 <div className="sync-grid">
@@ -794,13 +794,13 @@ export function App() {
                       <dl className="sync-card-meta">
                         <div><dt>Quelle</dt><dd>{pair.source_path}</dd></div>
                         <div><dt>Ziel</dt><dd>{pair.destination_path}</dd></div>
-                        <div><dt>Naechster Lauf</dt><dd>{formatDateTime(pair.next_run_at)}</dd></div>
+                        <div><dt>Nächster Lauf</dt><dd>{formatDateTime(pair.next_run_at)}</dd></div>
                         <div><dt>Letzter Lauf</dt><dd>{formatDateTime(pair.last_run_at)}</dd></div>
                       </dl>
                       <div className="action-stack">
                         <button className="table-button" type="button" onClick={() => setSelectedSyncPairId(pair.id)}>Berichte</button>
-                        <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Laeuft..." : "Jetzt starten"}</button>
-                        <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Loeschen</button>
+                        <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Läuft..." : "Jetzt starten"}</button>
+                        <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Löschen</button>
                       </div>
                     </article>
                   ))}
@@ -810,12 +810,12 @@ export function App() {
 
             <section className="dashboard-split">
               <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Zeitplan</p><h2>{selectedSyncPair ? `Zeitplan fuer ${selectedSyncPair.name}` : "Kein Sync ausgewaehlt"}</h2></div></div>
-                {!selectedSyncPair ? <p className="state">Waehle oben ein Sync-Paar aus, um den Zeitplan zu bearbeiten.</p> : null}
+                <div className="panel-header"><div><p className="eyebrow">Zeitplan</p><h2>{selectedSyncPair ? `Zeitplan für ${selectedSyncPair.name}` : "Kein Sync ausgewählt"}</h2></div></div>
+                {!selectedSyncPair ? <p className="state">Wähle oben ein Sync-Paar aus, um den Zeitplan zu bearbeiten.</p> : null}
                 {selectedSyncPair ? (
                   <form className="sync-form compact-form" onSubmit={handleUpdateSchedule}>
                     <label className="schedule-toggle"><span>Zeitplan aktiv</span><input type="checkbox" checked={scheduleEditState.schedule_enabled} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_enabled: event.target.checked }))} /></label>
-                    <label><span>Intervall</span><select value={scheduleEditState.schedule_type} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Taeglich</option><option value="weekly">Woechentlich</option><option value="hourly">Stuendlich</option><option value="interval">Alle X Minuten</option></select></label>
+                    <label><span>Intervall</span><select value={scheduleEditState.schedule_type} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="hourly">Stündlich</option><option value="interval">Alle X Minuten</option></select></label>
                     {scheduleEditState.schedule_type === "interval" ? (
                       <label><span>Minuten</span><input min={5} step={5} type="number" value={scheduleEditState.schedule_interval_minutes} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_interval_minutes: Number(event.target.value) }))} /></label>
                     ) : (
@@ -830,10 +830,10 @@ export function App() {
               </section>
 
               <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Run-Historie</p><h2>{selectedSyncPair ? selectedSyncPair.name : "Noch kein Sync-Paar ausgewaehlt"}</h2></div></div>
-                {!selectedSyncPair ? <p className="state">Waehle oben ein Sync-Paar aus.</p> : null}
-                {selectedSyncPair && runLoading ? <p className="state">Lade letzte Laeufe...</p> : null}
-                {selectedSyncPair && !runLoading && runs.length === 0 ? <p className="state">Fuer dieses Sync-Paar gibt es noch keine Laeufe.</p> : null}
+                <div className="panel-header"><div><p className="eyebrow">Run-Historie</p><h2>{selectedSyncPair ? selectedSyncPair.name : "Noch kein Sync-Paar ausgewählt"}</h2></div></div>
+                {!selectedSyncPair ? <p className="state">Wähle oben ein Sync-Paar aus.</p> : null}
+                {selectedSyncPair && runLoading ? <p className="state">Lade letzte Läufe...</p> : null}
+                {selectedSyncPair && !runLoading && runs.length === 0 ? <p className="state">Für dieses Sync-Paar gibt es noch keine Läufe.</p> : null}
                 {selectedSyncPair && runs.length > 0 ? (
                   <div className="run-list">
                     {runs.map((run) => (
@@ -856,15 +856,15 @@ export function App() {
               </section>
 
               <section className="panel report-panel">
-                <div className="panel-header"><div><p className="eyebrow">Bericht</p><h2>{selectedRun ? "Laufdetails" : "Kein Lauf ausgewaehlt"}</h2></div></div>
-                {!selectedRun ? <p className="state">Waehle links einen Lauf aus, um den Bericht anzuzeigen.</p> : null}
+                <div className="panel-header"><div><p className="eyebrow">Bericht</p><h2>{selectedRun ? "Laufdetails" : "Kein Lauf ausgewählt"}</h2></div></div>
+                {!selectedRun ? <p className="state">Wähle links einen Lauf aus, um den Bericht anzuzeigen.</p> : null}
                 {selectedRun ? (
                   <>
                     <div className="report-summary">
                       <article className="report-highlight"><span>Status</span><strong>{selectedRun.status}</strong></article>
                       <article className="report-highlight"><span>Trigger</span><strong>{selectedRun.trigger_type}</strong></article>
                       <article className="report-highlight"><span>Exit-Code</span><strong>{selectedRun.exit_code ?? "-"}</strong></article>
-                      <article className="report-highlight"><span>Geloeschte Dateien</span><strong>{selectedRun.files_deleted}</strong></article>
+                      <article className="report-highlight"><span>Gelöschte Dateien</span><strong>{selectedRun.files_deleted}</strong></article>
                     </div>
                     <p className="report-copy">{selectedRun.report}</p>
                     <div className="report-detail-grid">
@@ -872,8 +872,8 @@ export function App() {
                       <article className="report-block"><h3>Kommando</h3><code>{selectedRun.rclone_command}</code></article>
                     </div>
                     <article className="report-block">
-                      <h3>Vollstaendiges Log</h3>
-                      {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfuegbar."}</pre>}
+                      <h3>Vollständiges Log</h3>
+                      {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
                     </article>
                   </>
                 ) : null}
@@ -886,7 +886,7 @@ export function App() {
               <div>
                 <p className="eyebrow">Users</p>
                 <h1>Benutzerverwaltung</h1>
-                <p className="hero-copy">Hier verwaltest du lokale Benutzerkonten fuer Anmeldung und Administration.</p>
+                <p className="hero-copy">Hier verwaltest du lokale Benutzerkonten für Anmeldung und Administration.</p>
               </div>
             </section>
 
@@ -905,9 +905,9 @@ export function App() {
               </section>
 
               <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Passwort</p><h2>Passwort zuruecksetzen</h2></div></div>
+                <div className="panel-header"><div><p className="eyebrow">Passwort</p><h2>Passwort zurücksetzen</h2></div></div>
                 <form className="sync-form compact-form" onSubmit={handleResetPassword}>
-                  <label><span>Benutzer</span><select required value={passwordResetState.username} onChange={(event) => setPasswordResetState((current) => ({ ...current, username: event.target.value }))}><option value="">Bitte waehlen</option>{users.map((user) => <option key={user.username} value={user.username}>{user.username}</option>)}</select></label>
+                  <label><span>Benutzer</span><select required value={passwordResetState.username} onChange={(event) => setPasswordResetState((current) => ({ ...current, username: event.target.value }))}><option value="">Bitte wählen</option>{users.map((user) => <option key={user.username} value={user.username}>{user.username}</option>)}</select></label>
                   <label><span>Neues Passwort</span><input required minLength={8} type="password" value={passwordResetState.password} onChange={(event) => setPasswordResetState((current) => ({ ...current, password: event.target.value }))} /></label>
                   <button className="primary-button" type="submit" disabled={userSubmitting}>{userSubmitting ? "Speichere..." : "Passwort setzen"}</button>
                 </form>
@@ -928,7 +928,7 @@ export function App() {
                         <p>Angelegt: {formatDateTime(user.created_at)}</p>
                         <div className="action-stack">
                           <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleToggleUserActive(user)}>{user.is_active ? "Deaktivieren" : "Aktivieren"}</button>
-                          <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleDeleteUser(user.username)}>Loeschen</button>
+                          <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleDeleteUser(user.username)}>Löschen</button>
                         </div>
                       </article>
                     ))}
@@ -943,7 +943,7 @@ export function App() {
               <div>
                 <p className="eyebrow">Settings</p>
                 <h1>rclone und Systemkonfiguration</h1>
-                <p className="hero-copy">Hier richtest du die `rclone.conf` fuer pCloud ein, pruefst die Verbindung und verwaltest die technischen Grundlagen des Systems.</p>
+                <p className="hero-copy">Hier richtest du die `rclone.conf` für pCloud ein, prüfst die Verbindung und verwaltest die technischen Grundlagen des Systems.</p>
               </div>
             </section>
 
@@ -955,8 +955,8 @@ export function App() {
                 <>
                   <div className="settings-grid">
                     <article className="settings-card"><span className={`badge ${rcloneStatus.exists ? "idle" : "error"}`}>{rcloneStatus.exists ? "vorhanden" : "fehlt"}</span><h3>Konfigurationsdatei</h3><p>{rcloneStatus.config_path}</p></article>
-                    <article className="settings-card"><span className={`badge ${rcloneStatus.is_valid ? "idle" : "error"}`}>{rcloneStatus.is_valid ? "gueltig" : "ungueltig"}</span><h3>Erkannte Remotes</h3><p>{rcloneStatus.remotes.length > 0 ? rcloneStatus.remotes.join(", ") : "Keine"}</p></article>
-                    <article className="settings-card"><span className="badge idle">Info</span><h3>Datei</h3><p>{rcloneStatus.file_size ? `${rcloneStatus.file_size} Bytes` : "Keine Dateigroesse"}</p><p>{rcloneStatus.updated_at ? new Date(rcloneStatus.updated_at).toLocaleString("de-DE") : "Noch nie aktualisiert"}</p></article>
+                    <article className="settings-card"><span className={`badge ${rcloneStatus.is_valid ? "idle" : "error"}`}>{rcloneStatus.is_valid ? "gültig" : "ungültig"}</span><h3>Erkannte Remotes</h3><p>{rcloneStatus.remotes.length > 0 ? rcloneStatus.remotes.join(", ") : "Keine"}</p></article>
+                    <article className="settings-card"><span className="badge idle">Info</span><h3>Datei</h3><p>{rcloneStatus.file_size ? `${rcloneStatus.file_size} Bytes` : "Keine Dateigröße"}</p><p>{rcloneStatus.updated_at ? new Date(rcloneStatus.updated_at).toLocaleString("de-DE") : "Noch nie aktualisiert"}</p></article>
                   </div>
                   <p className="state">{rcloneStatus.detail}</p>
                 </>
@@ -972,10 +972,10 @@ export function App() {
             </section>
 
             <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Verbindungstest</p><h2>Erkannten Remote pruefen</h2></div></div>
+              <div className="panel-header"><div><p className="eyebrow">Verbindungstest</p><h2>Erkannten Remote prüfen</h2></div></div>
               <div className="inline-actions">
                 <button className="primary-button" type="button" disabled={testLoading || !rcloneStatus?.remotes.length} onClick={() => void handleRcloneTest()}>{testLoading ? "Teste..." : "Remote testen"}</button>
-                <span className="settings-note">{rcloneStatus?.remotes.length ? `Testet standardmaessig ${rcloneStatus.remotes[0]}` : "Zuerst eine gueltige rclone.conf hochladen"}</span>
+                <span className="settings-note">{rcloneStatus?.remotes.length ? `Testet standardmäßig ${rcloneStatus.remotes[0]}` : "Zuerst eine gültige rclone.conf hochladen"}</span>
               </div>
               {testResult ? <p className={`state ${testResult.ok ? "" : "error"}`}>{testResult.detail}</p> : null}
             </section>
@@ -997,7 +997,7 @@ export function App() {
               <div className="panel-header"><div><p className="eyebrow">Telegram Setup</p><h2>Bot verbinden</h2></div></div>
               <form className="settings-form" onSubmit={handleTelegramSave}>
                 <label className="schedule-toggle"><span>Telegram aktivieren</span><input type="checkbox" checked={telegramFormState.enabled} onChange={(event) => setTelegramFormState((current) => ({ ...current, enabled: event.target.checked }))} /></label>
-                <label><span>Bot Token</span><input type="password" placeholder={telegramStatus?.bot_token_configured ? "Bereits gespeichert, nur fuer Aenderung neu eingeben" : "123456:ABC..."} value={telegramFormState.bot_token} onChange={(event) => setTelegramFormState((current) => ({ ...current, bot_token: event.target.value }))} /></label>
+                <label><span>Bot Token</span><input type="password" placeholder={telegramStatus?.bot_token_configured ? "Bereits gespeichert, nur für Änderung neu eingeben" : "123456:ABC..."} value={telegramFormState.bot_token} onChange={(event) => setTelegramFormState((current) => ({ ...current, bot_token: event.target.value }))} /></label>
                 <label><span>Chat-ID</span><input value={telegramFormState.chat_id} onChange={(event) => setTelegramFormState((current) => ({ ...current, chat_id: event.target.value }))} /></label>
                 <label className="schedule-toggle"><span>Bei Erfolg senden</span><input type="checkbox" checked={telegramFormState.notify_on_success} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_success: event.target.checked }))} /></label>
                 <label className="schedule-toggle"><span>Bei Fehler senden</span><input type="checkbox" checked={telegramFormState.notify_on_error} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_error: event.target.checked }))} /></label>
@@ -1020,8 +1020,8 @@ export function App() {
           <div className="browser-overlay" role="dialog" aria-modal="true">
             <section className="browser-panel">
               <div className="panel-header">
-                <div><p className="eyebrow">Dateibrowser</p><h2>{browserField === "source_path" ? "Quellordner waehlen" : "Zielordner waehlen"}</h2></div>
-                <button className="table-button" type="button" onClick={closeBrowser}>Schliessen</button>
+                <div><p className="eyebrow">Dateibrowser</p><h2>{browserField === "source_path" ? "Quellordner wählen" : "Zielordner wählen"}</h2></div>
+                <button className="table-button" type="button" onClick={closeBrowser}>Schließen</button>
               </div>
 
               <div className="browser-topbar">
@@ -1058,8 +1058,8 @@ export function App() {
                           </div>
                         </div>
                         <div className="inline-actions">
-                          <button className="table-button" type="button" onClick={() => void loadBrowser(entry.path, browserMode)}>Oeffnen</button>
-                          <button className="table-button primary-inline" type="button" onClick={() => applyBrowserPath(entry.path)}>Auswaehlen</button>
+                          <button className="table-button" type="button" onClick={() => void loadBrowser(entry.path, browserMode)}>Öffnen</button>
+                          <button className="table-button primary-inline" type="button" onClick={() => applyBrowserPath(entry.path)}>Auswählen</button>
                         </div>
                       </article>
                     ))}
@@ -1068,7 +1068,7 @@ export function App() {
               </div>
 
               <div className="browser-footer">
-                <button className="primary-button" type="button" onClick={() => applyBrowserPath(browserData?.current_path || "")} disabled={!browserData?.current_path}>Aktuellen Ordner uebernehmen</button>
+                <button className="primary-button" type="button" onClick={() => applyBrowserPath(browserData?.current_path || "")} disabled={!browserData?.current_path}>Aktuellen Ordner übernehmen</button>
               </div>
             </section>
           </div>

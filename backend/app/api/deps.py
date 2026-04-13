@@ -13,7 +13,7 @@ def require_current_user(request: Request, db: Session = Depends(get_db)) -> Use
 
     user = get_user_by_username(db, username)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sitzung ungueltig")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sitzung ungültig")
 
     return user
 

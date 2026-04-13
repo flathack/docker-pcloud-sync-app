@@ -44,10 +44,15 @@ def _build_rclone_command(sync_pair: SyncPair) -> list[str]:
 
     global_flags = os.getenv(
         "RCLONE_GLOBAL_FLAGS",
-        "--use-json-log --log-level INFO --stats 10s --stats-one-line-json",
+        "--use-json-log --log-level INFO --stats 10s",
     )
     if global_flags.strip():
-        command.extend(shlex.split(global_flags))
+        filtered_flags = [
+            flag
+            for flag in shlex.split(global_flags)
+            if flag != "--stats-one-line-json"
+        ]
+        command.extend(filtered_flags)
 
     return command
 
@@ -106,7 +111,7 @@ def _build_report(
 ) -> str:
     base = (
         f"Sync '{sync_pair.name}' wurde per {sync_pair.mode} von {sync_pair.source_path} nach "
-        f"{sync_pair.destination_path} ausgefuehrt. Status: {status}. Exit-Code: {exit_code}. "
+        f"{sync_pair.destination_path} ausgeführt. Status: {status}. Exit-Code: {exit_code}. "
         f"Dauer: {duration_seconds}s."
     )
     if status == "success":

@@ -53,7 +53,7 @@ def _browse_local(path_value: str | None) -> BrowserResponse:
         raise FileNotFoundError(f"Pfad nicht gefunden: {path_value}")
 
     if not any(_is_relative_to(requested_path, root) or requested_path == root for root in roots):
-        raise PermissionError("Pfad liegt ausserhalb der erlaubten Browser-Wurzeln")
+        raise PermissionError("Pfad liegt außerhalb der erlaubten Browser-Wurzeln")
 
     entries = [
         BrowserEntry(name=entry.name, path=str(entry), entry_type="directory")
@@ -117,7 +117,7 @@ def browse(path_value: str | None, backend_type: str = "local") -> BrowserRespon
 def create_directory(path_value: str | None, directory_name: str, backend_type: str = "local") -> BrowserResponse:
     clean_name = directory_name.strip().strip("/").strip()
     if not clean_name or "/" in clean_name or "\\" in clean_name:
-        raise RuntimeError("Bitte einen gueltigen Ordnernamen ohne Pfadtrenner angeben.")
+        raise RuntimeError("Bitte einen gültigen Ordnernamen ohne Pfadtrenner angeben.")
 
     if backend_type == "remote":
         base_path = path_value or os.getenv("DEFAULT_REMOTE_ROOT", "pcloud:")
@@ -133,11 +133,11 @@ def create_directory(path_value: str | None, directory_name: str, backend_type: 
 
     base_path = Path(path_value).resolve() if path_value else roots[0]
     if not any(_is_relative_to(base_path, root) or base_path == root for root in roots):
-        raise PermissionError("Pfad liegt ausserhalb der erlaubten Browser-Wurzeln")
+        raise PermissionError("Pfad liegt außerhalb der erlaubten Browser-Wurzeln")
 
     target = (base_path / clean_name).resolve()
     if not any(_is_relative_to(target, root) or target == root for root in roots):
-        raise PermissionError("Der neue Ordner liegt ausserhalb der erlaubten Browser-Wurzeln")
+        raise PermissionError("Der neue Ordner liegt außerhalb der erlaubten Browser-Wurzeln")
 
     target.mkdir(parents=False, exist_ok=True)
     return _browse_local(str(base_path))

@@ -83,7 +83,7 @@ def _telegram_status_from_settings(settings: dict[str, object]) -> TelegramSetti
     chat_id = str(settings.get("chat_id", "") or "") or None
     configured = bool(bot_token and chat_id)
     if not configured:
-        detail = "Telegram ist noch nicht vollstaendig konfiguriert."
+        detail = "Telegram ist noch nicht vollständig konfiguriert."
     elif enabled:
         detail = "Telegram-Benachrichtigungen sind aktiv."
     else:
@@ -229,7 +229,7 @@ def send_sync_notification(sync_pair_name: str, run_status: str, short_log: str,
     bot_token = str(settings.get("bot_token", "") or "")
     chat_id = str(settings.get("chat_id", "") or "")
     if not bot_token or not chat_id:
-        return TelegramTestResult(ok=False, detail="Telegram ist aktiviert, aber nicht vollstaendig konfiguriert.")
+        return TelegramTestResult(ok=False, detail="Telegram ist aktiviert, aber nicht vollständig konfiguriert.")
 
     message = (
         f"Sync: {sync_pair_name}\n"
