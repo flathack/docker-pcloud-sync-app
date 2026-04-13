@@ -1,4 +1,5 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import packageJson from "../package.json";
 
 type UserSummary = { username: string; role: string; is_active: boolean; created_at: string };
 type SyncPairSummary = {
@@ -105,6 +106,7 @@ const initialTelegramFormState = {
   notify_on_success: false,
   notify_on_error: true,
 };
+const appVersion = packageJson.version;
 
 async function apiFetch(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
@@ -420,6 +422,19 @@ export function App() {
     void loadRunLog(selectedRunId);
   }, [selectedRunId]);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    const hasRunningRun = runs.some((run) => run.status === "running") || recentRuns.some((run) => run.status === "running") || syncPairs.some((pair) => pair.status === "running");
+    if (!hasRunningRun) return;
+
+    const intervalId = window.setInterval(() => {
+      void loadDashboardData();
+      if (selectedSyncPairId) void loadRuns(selectedSyncPairId);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [currentUser, runs, recentRuns, syncPairs, selectedSyncPairId]);
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoginSubmitting(true);
@@ -712,6 +727,7 @@ export function App() {
               <p className="sidebar-user-name">{currentUser.username}</p>
               <p className="sidebar-copy">Angemeldet und aktiv</p>
             </div>
+            <a className="sidebar-help-link" href="https://flathack.github.io/help/pcloud-sync-app-hilfe.html" target="_blank" rel="noreferrer">Hilfe öffnen</a>
           </section>
         </div>
 
@@ -1028,6 +1044,10 @@ export function App() {
             </section>
           </>
         )}
+
+        <footer className="app-footer">
+          Entwickelt von Steven Schödel, Version {appVersion}
+        </footer>
 
         {browserField ? (
           <div className="browser-overlay" role="dialog" aria-modal="true">

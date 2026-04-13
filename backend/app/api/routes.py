@@ -257,7 +257,7 @@ def start_sync_pair_run(
     if sync_pair is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync-Paar nicht gefunden")
 
-    return sync_run_service.start_sync_run(db, sync_pair, trigger_type=payload.trigger_type)
+    return sync_run_service.start_sync_run_async(db, sync_pair, trigger_type=payload.trigger_type)
 
 
 @router.get("/runs/{run_id}", response_model=SyncRunSummary)

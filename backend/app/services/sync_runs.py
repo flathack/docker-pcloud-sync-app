@@ -1,13 +1,20 @@
+import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db.session import SessionLocal
 from app.models.sync_pair import SyncPair
 from app.models.sync_run import SyncRun
 from app.runners.rclone_runner import run_sync_pair
 from app.services import settings as settings_service
 from app.services.sync_pairs import calculate_next_run
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def list_runs(db: Session, limit: int = 50) -> list[SyncRun]:
@@ -37,6 +44,84 @@ def read_run_log(run: SyncRun) -> str:
         return ""
 
     return log_path.read_text(encoding="utf-8")
+
+
+def _apply_run_result(db: Session, sync_pair: SyncPair, run: SyncRun) -> None:
+    telegram_result = settings_service.send_sync_notification(
+        sync_pair.name,
+        run.status,
+        run.short_log,
+        run.report,
+    )
+    if not telegram_result.ok:
+        run.report = f"{run.report}\n\nTelegram-Versand fehlgeschlagen: {telegram_result.detail}"
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+
+
+def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
+    db = SessionLocal()
+    try:
+        sync_pair = db.get(SyncPair, sync_pair_id)
+        run = db.get(SyncRun, run_id)
+        if sync_pair is None or run is None:
+            return
+
+        result = run_sync_pair(sync_pair)
+
+        run.status = result.status
+        run.started_at = result.started_at
+        run.finished_at = result.finished_at
+        run.duration_seconds = result.duration_seconds
+        run.files_transferred = result.files_transferred
+        run.files_deleted = result.files_deleted
+        run.error_count = result.error_count
+        run.bytes_transferred = result.bytes_transferred
+        run.exit_code = result.exit_code
+        run.short_log = result.short_log
+        run.report = result.report
+        run.full_log_path = result.full_log_path
+        run.rclone_command = result.command
+
+        sync_pair.status = "idle" if result.status == "success" else "error"
+        sync_pair.last_status = result.status
+        sync_pair.last_run_at = result.finished_at
+        sync_pair.next_run_at = calculate_next_run(
+            sync_pair.schedule_enabled,
+            sync_pair.schedule_type,
+            sync_pair.schedule_interval_minutes,
+            sync_pair.schedule_time,
+            sync_pair.schedule_weekday,
+            now=result.finished_at,
+        )
+
+        db.add(run)
+        db.add(sync_pair)
+        db.commit()
+        db.refresh(run)
+
+        _apply_run_result(db, sync_pair, run)
+    except Exception as exc:
+        sync_pair = db.get(SyncPair, sync_pair_id)
+        run = db.get(SyncRun, run_id)
+        if sync_pair is not None:
+            sync_pair.status = "error"
+            sync_pair.last_status = "error"
+            db.add(sync_pair)
+        if run is not None:
+            finished_at = utc_now()
+            run.status = "error"
+            run.finished_at = finished_at
+            run.duration_seconds = max(1, int((finished_at - run.started_at).total_seconds()))
+            run.error_count = 1
+            run.exit_code = -1
+            run.short_log = f"Interner Fehler beim Sync-Lauf: {exc}"
+            run.report = f"Der Hintergrundlauf ist mit einem internen Fehler abgebrochen: {exc}"
+            db.add(run)
+        db.commit()
+    finally:
+        db.close()
 
 
 def start_sync_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual") -> SyncRun:
@@ -77,16 +162,43 @@ def start_sync_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual
     db.commit()
     db.refresh(run)
 
-    telegram_result = settings_service.send_sync_notification(
-        sync_pair.name,
-        run.status,
-        run.short_log,
-        run.report,
-    )
-    if not telegram_result.ok:
-        run.report = f"{run.report}\n\nTelegram-Versand fehlgeschlagen: {telegram_result.detail}"
-        db.add(run)
-        db.commit()
-        db.refresh(run)
+    _apply_run_result(db, sync_pair, run)
+    return run
 
+
+def start_sync_run_async(db: Session, sync_pair: SyncPair, trigger_type: str = "manual") -> SyncRun:
+    started_at = utc_now()
+    run = SyncRun(
+        sync_pair_id=sync_pair.id,
+        trigger_type=trigger_type,
+        status="running",
+        started_at=started_at,
+        finished_at=started_at,
+        duration_seconds=0,
+        files_transferred=0,
+        files_deleted=0,
+        error_count=0,
+        bytes_transferred=0,
+        exit_code=None,
+        short_log="Sync-Lauf wurde gestartet.",
+        report="Der Sync-Lauf läuft im Hintergrund. Der Bericht wird nach Abschluss aktualisiert.",
+        full_log_path=None,
+        rclone_command="",
+    )
+
+    sync_pair.status = "running"
+    sync_pair.last_status = "running"
+
+    db.add(run)
+    db.add(sync_pair)
+    db.commit()
+    db.refresh(run)
+
+    worker = threading.Thread(
+        target=_execute_sync_run_in_background,
+        args=(sync_pair.id, run.id),
+        name=f"sync-run-{run.id}",
+        daemon=True,
+    )
+    worker.start()
     return run
