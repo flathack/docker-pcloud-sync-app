@@ -71,6 +71,7 @@ type UserAdminSummary = { username: string; role: string; is_active: boolean; cr
 type BrowserField = "source_path" | "destination_path" | null;
 type BrowserMode = "local" | "remote";
 type AppSection = "dashboard" | "users" | "settings";
+type ThemeMode = "light" | "dark";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 const weekdayOptions = [
@@ -141,6 +142,10 @@ function describeSchedule(pair: Pick<SyncPairSummary, "schedule_enabled" | "sche
 }
 
 export function App() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    if (typeof window === "undefined") return "light";
+    return window.localStorage.getItem("theme-mode") === "dark" ? "dark" : "light";
+  });
   const [currentUser, setCurrentUser] = useState<UserSummary | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [loginSubmitting, setLoginSubmitting] = useState(false);
@@ -368,6 +373,11 @@ export function App() {
   }
 
   useEffect(() => { void checkSession(); }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    window.localStorage.setItem("theme-mode", themeMode);
+  }, [themeMode]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -708,8 +718,11 @@ export function App() {
         <div className="sidebar-bottom">
           <div className="sidebar-version-card">
             <strong>Sync Center</strong>
-            <p>Reports, Zeitplaene und Browser im Portainer-Stil.</p>
+            <p>Reports, Zeitpläne und Browser im Portainer-Stil.</p>
           </div>
+          <button className="table-button theme-toggle" type="button" onClick={() => setThemeMode((current) => current === "dark" ? "light" : "dark")}>
+            {themeMode === "dark" ? "Hellmodus" : "Dunkelmodus"}
+          </button>
           <button className="table-button logout-button" type="button" onClick={handleLogout}>Logout</button>
         </div>
       </aside>
@@ -720,7 +733,7 @@ export function App() {
             <section className="hero hero-rich">
               <div>
                 <p className="eyebrow">Dashboard</p>
-                <h1>Sync-Zentrale fuer NAS und pCloud</h1>
+                <h1>Sync-Zentrale für NAS und pCloud</h1>
                 <p className="hero-copy">Hier siehst du, was zuletzt passiert ist, planst automatische Läufe und öffnest Berichte pro Sync.</p>
                 {!rcloneStatus?.exists ? <p className="state error">rclone ist noch nicht konfiguriert. Richte die Verbindung in den Settings ein.</p> : null}
               </div>
@@ -732,7 +745,7 @@ export function App() {
             <section className="stats-grid">
               <article className="stat-card accent-blue"><span>Sync-Paare</span><strong>{syncPairs.length}</strong><p>Aktive Verbindungen im System</p></article>
               <article className="stat-card accent-gold"><span>Erfolgreiche Läufe</span><strong>{successfulRuns}</strong><p>Aus den letzten {recentRuns.length} Runs</p></article>
-              <article className="stat-card accent-green"><span>Transfer-Volumen</span><strong>{formatBytes(totalBytes)}</strong><p>Gesamt ueber die letzte Run-Serie</p></article>
+              <article className="stat-card accent-green"><span>Transfer-Volumen</span><strong>{formatBytes(totalBytes)}</strong><p>Gesamt über die letzte Run-Serie</p></article>
               <article className="stat-card accent-slate"><span>Dateien bewegt</span><strong>{totalFiles}</strong><p>Transferierte Dateien aus Reports</p></article>
             </section>
 

@@ -5,6 +5,12 @@
   color: #172b4d;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  background: #0f1722;
+  color: #e6edf5;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -463,6 +469,11 @@ select {
   width: 100%;
 }
 
+.theme-toggle {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
 .primary-button:hover {
   background: #177fb6;
 }
@@ -805,6 +816,158 @@ select {
 .browser-footer {
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+:root[data-theme="dark"] body {
+  background: #0f1722;
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .sidebar {
+  background: linear-gradient(180deg, #0b2033, #102a42 55%, #0f2337);
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .sidebar-cluster,
+:root[data-theme="dark"] .sidebar-user-card,
+:root[data-theme="dark"] .sidebar-version-card {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .sidebar-home-link,
+:root[data-theme="dark"] .sidebar-section-label,
+:root[data-theme="dark"] .sidebar-copy,
+:root[data-theme="dark"] .sidebar-version-card p,
+:root[data-theme="dark"] .sidebar-brand-subtitle {
+  color: rgba(230, 237, 245, 0.76);
+}
+
+:root[data-theme="dark"] .hero,
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .stat-card,
+:root[data-theme="dark"] .sync-card,
+:root[data-theme="dark"] .run-card,
+:root[data-theme="dark"] .report-block,
+:root[data-theme="dark"] .settings-card,
+:root[data-theme="dark"] .browser-panel,
+:root[data-theme="dark"] .browser-shell {
+  background: #16202b;
+  border-color: #2a3948;
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .hero-copy,
+:root[data-theme="dark"] .state,
+:root[data-theme="dark"] .settings-note,
+:root[data-theme="dark"] .sync-card-header p,
+:root[data-theme="dark"] .stat-card p,
+:root[data-theme="dark"] .settings-card p,
+:root[data-theme="dark"] .sync-card p,
+:root[data-theme="dark"] .report-copy,
+:root[data-theme="dark"] .report-block p,
+:root[data-theme="dark"] .browser-entry p {
+  color: #9fb0c3;
+}
+
+:root[data-theme="dark"] .eyebrow,
+:root[data-theme="dark"] .sync-card-meta dt,
+:root[data-theme="dark"] .run-metrics dt,
+:root[data-theme="dark"] .browser-column-header {
+  color: #88a0b8;
+}
+
+:root[data-theme="dark"] .accent-blue,
+:root[data-theme="dark"] .accent-gold,
+:root[data-theme="dark"] .accent-green,
+:root[data-theme="dark"] .accent-slate {
+  background: #16202b;
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .sync-card-meta div,
+:root[data-theme="dark"] .run-metrics div,
+:root[data-theme="dark"] .report-highlight,
+:root[data-theme="dark"] .schedule-toggle,
+:root[data-theme="dark"] .browser-topbar {
+  background: #1b2835;
+  border-color: #2a3948;
+}
+
+:root[data-theme="dark"] .sync-form label,
+:root[data-theme="dark"] .settings-form label,
+:root[data-theme="dark"] .report-block code {
+  color: #dce6f2;
+}
+
+:root[data-theme="dark"] .sync-form input,
+:root[data-theme="dark"] .sync-form select,
+:root[data-theme="dark"] .settings-form input,
+:root[data-theme="dark"] .browser-create-row input {
+  background: #0f1722;
+  border-color: #314355;
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .table-button {
+  background: #192531;
+  border-color: #334455;
+  color: #dce6f2;
+}
+
+:root[data-theme="dark"] .table-button:hover {
+  background: #223142;
+  border-color: #48627a;
+}
+
+:root[data-theme="dark"] .primary-button {
+  background: #1d8fcc;
+  border-color: #1d8fcc;
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .primary-inline {
+  background: #16202b;
+  border-color: #1d8fcc;
+  color: #63bdf1;
+}
+
+:root[data-theme="dark"] .primary-inline:hover {
+  background: rgba(29, 143, 204, 0.14);
+}
+
+:root[data-theme="dark"] .badge.idle {
+  background: rgba(29, 143, 204, 0.16);
+  color: #6fc3f2;
+}
+
+:root[data-theme="dark"] .badge.running {
+  background: rgba(245, 166, 35, 0.18);
+  color: #ffcb6f;
+}
+
+:root[data-theme="dark"] .badge.error,
+:root[data-theme="dark"] .state.error {
+  background: rgba(209, 67, 67, 0.16);
+  color: #ff8e8e;
+}
+
+:root[data-theme="dark"] .browser-column-header {
+  background: #1b2835;
+}
+
+:root[data-theme="dark"] .browser-entry {
+  border-top-color: #243444;
+}
+
+:root[data-theme="dark"] .folder-icon,
+:root[data-theme="dark"] .browser-chip {
+  background: rgba(29, 143, 204, 0.16);
+  color: #6fc3f2;
+}
+
+:root[data-theme="dark"] .log-output {
+  background: #0b1118;
+  color: #dce6f2;
 }
 
 @media (max-width: 980px) {
