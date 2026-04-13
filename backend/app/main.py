@@ -5,6 +5,7 @@ from app.api.routes import router
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.models.sync_pair import SyncPair
+from app.models.sync_run import SyncRun
 
 app = FastAPI(title="PCloud Sync Docker App", version="0.1.0")
 

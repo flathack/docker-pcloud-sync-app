@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import Boolean, DateTime, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -30,3 +30,5 @@ class SyncPair(Base):
         default=utc_now,
         onupdate=utc_now,
     )
+
+    runs = relationship("SyncRun", back_populates="sync_pair", cascade="all, delete-orphan")

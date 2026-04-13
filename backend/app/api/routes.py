@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
+from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
 from app.services import sync_pairs as sync_pair_service
+from app.services import sync_runs as sync_run_service
 
 router = APIRouter(prefix="/api")
 
@@ -53,3 +55,29 @@ def delete_sync_pair(sync_pair_id: str, db: Session = Depends(get_db)) -> Respon
 
     sync_pair_service.delete_sync_pair(db, sync_pair)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/sync-pairs/{sync_pair_id}/runs", response_model=list[SyncRunSummary])
+def list_sync_pair_runs(sync_pair_id: str, db: Session = Depends(get_db)) -> list[SyncRunSummary]:
+    sync_pair = sync_pair_service.get_sync_pair(db, sync_pair_id)
+    if sync_pair is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync-Paar nicht gefunden")
+
+    return sync_run_service.list_runs_for_sync_pair(db, sync_pair_id)
+
+
+@router.post(
+    "/sync-pairs/{sync_pair_id}/run",
+    response_model=SyncRunSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+def start_sync_pair_run(
+    sync_pair_id: str,
+    payload: SyncRunCreate,
+    db: Session = Depends(get_db),
+) -> SyncRunSummary:
+    sync_pair = sync_pair_service.get_sync_pair(db, sync_pair_id)
+    if sync_pair is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync-Paar nicht gefunden")
+
+    return sync_run_service.start_demo_run(db, sync_pair, trigger_type=payload.trigger_type)
