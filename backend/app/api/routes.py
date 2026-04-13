@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_current_user
 from app.db.session import get_db
 from app.schemas.auth import LoginRequest, UserSummary
 from app.schemas.browser import BrowserResponse
+from app.schemas.settings import RcloneConfigStatus, RcloneConfigTestRequest, RcloneConfigTestResult
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
 from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
 from app.services import auth as auth_service
 from app.services import browser as browser_service
+from app.services import settings as settings_service
 from app.services import sync_pairs as sync_pair_service
 from app.services import sync_runs as sync_run_service
 
@@ -170,3 +172,30 @@ def get_run_log(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
 
     return {"log": sync_run_service.read_run_log(run)}
+
+
+@router.get("/settings/rclone/status", response_model=RcloneConfigStatus)
+def get_rclone_status(
+    current_user: UserSummary = Depends(require_current_user),
+) -> RcloneConfigStatus:
+    return settings_service.get_rclone_config_status()
+
+
+@router.post("/settings/rclone/upload", response_model=RcloneConfigStatus)
+async def upload_rclone_config(
+    file: UploadFile = File(...),
+    current_user: UserSummary = Depends(require_current_user),
+) -> RcloneConfigStatus:
+    try:
+        content = await file.read()
+        return settings_service.save_rclone_config(file.filename or "rclone.conf", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/settings/rclone/test", response_model=RcloneConfigTestResult)
+def test_rclone_config(
+    payload: RcloneConfigTestRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> RcloneConfigTestResult:
+    return settings_service.test_rclone_remote(payload.remote_name)
