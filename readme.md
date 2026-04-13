@@ -1,5 +1,24 @@
 # PCloud Sync Docker App
 
+## Aktueller Stand
+
+Der aktuelle Repository-Stand enthaelt bereits einen lauffaehigen MVP-Prototypen:
+
+- FastAPI-Backend mit SQLite
+- Session-basierte Anmeldung mit lokalem Admin-User
+- CRUD fuer `sync_pairs`
+- Run-Historie fuer `sync_runs`
+- Runner-Basis fuer `rclone` mit Logdateien
+- React-Frontend mit Login, Dashboard, Run-Historie und Log-Anzeige
+- Dockerfile, `docker-compose.yml` und `.env.example`
+
+Der aktuelle lokale Standard-Login fuer die Entwicklung ist:
+
+```text
+Benutzername: admin
+Passwort: change-me-now
+```
+
 ## Zielbild
 
 Web-Anwendung zur Verwaltung und Beobachtung von Synchronisationen zwischen lokalen oder NAS-Ordnern und pCloud-Ordnern. Die App laeuft lokal in VSCode und spaeter produktiv in Docker auf einem Server oder NAS.
@@ -295,7 +314,7 @@ CREATE TABLE sync_runs (
 | `POST` | `/api/sync-pairs/{id}/enable` | Aktivieren |
 | `POST` | `/api/sync-pairs/{id}/disable` | Deaktivieren |
 | `POST` | `/api/sync-pairs/{id}/run` | Manuellen Lauf starten |
-| `POST` | `/api/sync-pairs/{id}/stop` | Aktiven Lauf stoppen |
+| `POST` | `/api/sync-pairs/{id}/stop` | Aktiven Lauf stoppen, spaeter als echter Prozessabbruch |
 
 ### Monitoring
 
@@ -352,7 +371,7 @@ CREATE TABLE sync_runs (
 
 ### Datenquelle
 
-`rclone` liefert ueber Exit-Code, stdout, stderr und optional JSON-nahe Formate bereits nutzbare Informationen. Fuer das MVP ist die App aber die autoritative Quelle fuer Historie.
+`rclone` liefert ueber Exit-Code, stdout, stderr und optional JSON-nahe Formate bereits nutzbare Informationen. Fuer das MVP ist die App aber die autoritative Quelle fuer Historie. Der aktuelle Code schreibt pro Lauf bereits eine Logdatei und speichert Exit-Code, Kommandozeile und Kurzstatus in `sync_runs`.
 
 ### Vorgehen
 
@@ -391,8 +410,8 @@ rclone sync SOURCE DEST \
 
 - Ein lokaler Admin-Benutzer
 - Login per Username/Passwort
-- Passwort-Hashing mit `argon2`
-- Serverseitige Session in signiertem Cookie oder Session-Store
+- Passwort-Hashing per PBKDF2 als pragmatische lokale MVP-Loesung
+- Serverseitige Session in signiertem Cookie
 - Session-Cookie:
   - `HttpOnly`
   - `Secure` in Produktion
@@ -522,7 +541,7 @@ TELEGRAM_CHAT_ID=
 
 | Bereich | Ort |
 |---|---|
-| SQLite DB | `/app/data/db/app.db` |
+| SQLite DB | `/app/backend/data/app.db` |
 | Run-Logs | `/app/data/logs/` |
 | App-Konfiguration | `/app/data/config/` |
 | rclone Config | `/app/data/config/rclone/rclone.conf` |
@@ -639,13 +658,10 @@ Wenn `TELEGRAM_ENABLED=false`, wird ein `NoopNotifier` verwendet.
 1. Login mit lokalem Admin-User
 2. Dashboard mit Liste aller Sync-Paare
 3. Sync-Paar anlegen, bearbeiten, loeschen
-4. Sync-Paar aktivieren oder deaktivieren
-5. Manuellen Lauf starten
-6. Lauf stoppen
-7. Run-Historie anzeigen
-8. Logauszug anzeigen
-9. Zeitgesteuerte Runs per Cron
-10. Docker-Start lokal und auf NAS/Server
+4. Manuellen Lauf starten
+5. Run-Historie anzeigen
+6. Logauszug anzeigen
+7. Docker-Start lokal und auf NAS/Server
 
 ### Nicht im ersten MVP
 
@@ -654,6 +670,8 @@ Wenn `TELEGRAM_ENABLED=false`, wird ein `NoopNotifier` verwendet.
 - Verteilte Worker
 - Live-Websocket-Streaming
 - Erweiterte Konfliktlogik fuer komplexe `bisync`-Faelle
+- Echter Prozessabbruch fuer laufende rclone-Jobs
+- Aktivieren/Deaktivieren pro Sync-Paar in der UI
 
 ## Meilensteinplan in 3 Phasen
 
@@ -704,25 +722,21 @@ Ziel: Betrieb auf Server oder NAS.
 
 ## Konkrete naechste Schritte
 
-1. Repository in `backend/` und `frontend/` strukturieren
-2. FastAPI-Basis mit `GET /api/health` und Login-Endpunkt erstellen
-3. SQLite + SQLAlchemy + Alembic einrichten
-4. Modell `sync_pairs` und `sync_runs` implementieren
-5. API fuer CRUD und `Run now` bauen
-6. Erstes `rclone`-Runner-Modul mit Testkommando integrieren
-7. Einfaches React-Dashboard anschliessen
-8. Danach Dockerfile und Compose ergaenzen
+1. `rclone` auf dem Zielsystem installieren oder im Container mit echter Konfiguration starten
+2. `.env.example` nach `.env` uebertragen und Zugangsdaten anpassen
+3. `RCLONE_CONFIG` auf eine funktionierende `rclone.conf` zeigen lassen
+4. Frontend mit Node.js lokal starten oder direkt den Docker-Weg nutzen
+5. Danach den ersten echten Sync gegen Testordner pruefen
 
 ## Erster Entwicklungsschritt fuer heute in VSCode
 
-Der sinnvollste erste Schritt ist ein minimaler lokaler Backend-Prototyp:
+Der Prototyp ist inzwischen umgesetzt. Fuer den naechsten praktischen Entwicklungsschritt sollte jetzt ein echter End-to-End-Test folgen:
 
-1. `backend/app/main.py` mit FastAPI anlegen
-2. `GET /api/health` bereitstellen
-3. `GET /api/sync-pairs` zunaechst mit Mock-Daten liefern
-4. Ein erstes React-Frontend anzeigen, das diese Liste rendert
-
-Damit ist die Grundkommunikation zwischen UI und Backend geklaert, bevor `rclone`, Auth und Datenbank dazukommen.
+1. Node.js lokal installieren, falls noch nicht vorhanden
+2. Backend starten
+3. Frontend starten
+4. Mit dem Admin-Login anmelden
+5. Ein Test-Sync-Paar anlegen und `Run now` ausloesen
 
 ## Vorschlag fuer den allerersten Prototypen
 

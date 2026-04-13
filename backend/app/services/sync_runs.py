@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +15,21 @@ def list_runs_for_sync_pair(db: Session, sync_pair_id: str) -> list[SyncRun]:
         .order_by(SyncRun.started_at.desc())
     )
     return list(db.scalars(statement))
+
+
+def get_run(db: Session, run_id: str) -> SyncRun | None:
+    return db.get(SyncRun, run_id)
+
+
+def read_run_log(run: SyncRun) -> str:
+    if not run.full_log_path:
+        return ""
+
+    log_path = Path(run.full_log_path)
+    if not log_path.exists():
+        return ""
+
+    return log_path.read_text(encoding="utf-8")
 
 
 def start_sync_run(db: Session, sync_pair: SyncPair, trigger_type: str = "manual") -> SyncRun:

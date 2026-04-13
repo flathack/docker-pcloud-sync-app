@@ -126,3 +126,29 @@ def start_sync_pair_run(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync-Paar nicht gefunden")
 
     return sync_run_service.start_sync_run(db, sync_pair, trigger_type=payload.trigger_type)
+
+
+@router.get("/runs/{run_id}", response_model=SyncRunSummary)
+def get_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> SyncRunSummary:
+    run = sync_run_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
+
+    return run
+
+
+@router.get("/runs/{run_id}/log")
+def get_run_log(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> dict[str, str]:
+    run = sync_run_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
+
+    return {"log": sync_run_service.read_run_log(run)}
