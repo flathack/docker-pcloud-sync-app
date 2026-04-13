@@ -20,12 +20,10 @@ BYTE_TRANSFERRED_PATTERN = re.compile(
 )
 ERROR_COUNT_PATTERN = re.compile(r"Errors:\s*(?P<count>\d+)", re.IGNORECASE)
 DELETED_COUNT_PATTERN = re.compile(r"Deleted:\s*(?P<count>\d+)", re.IGNORECASE)
-SPEED_PATTERN = re.compile(
-    r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>[KMGTPE]?i?B|B)/s",
-    re.IGNORECASE,
-)
+SPEED_PATTERN = re.compile(r"(?P<value>\d+(?:[.,]\d+)?)\s*(?P<unit>[KMGTPE]?i?B|B)/s", re.IGNORECASE)
 ETA_PATTERN = re.compile(r"ETA\s+(?P<eta>[0-9a-z]+)", re.IGNORECASE)
 FILE_EVENT_PATTERN = re.compile(r"(Copied|Moved|Updated|Transferred|Renamed)", re.IGNORECASE)
+REMOTE_PATH_PATTERN = re.compile(r"^[^/\\:]+:.+|^[^/\\:]+:$")
 
 
 def utc_now() -> datetime:
@@ -76,22 +74,56 @@ class ParsedStats:
     percent_complete: float | None = None
 
 
+@dataclass
+class PreflightResult:
+    ok: bool
+    detail: str
+    planned_deletions: int = 0
+
+
 def _logs_dir() -> Path:
     log_dir = Path(os.getenv("APP_LOG_DIR", Path(__file__).resolve().parents[3] / "data" / "logs"))
     log_dir.mkdir(parents=True, exist_ok=True)
     return log_dir
 
 
+def _is_remote_path(path: str) -> bool:
+    return bool(REMOTE_PATH_PATTERN.match(path))
+
+
+def _rclone_binary() -> str:
+    return os.getenv("RCLONE_BINARY", "rclone")
+
+
+def _run_subprocess(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, capture_output=True, text=True, check=False, timeout=timeout)
+
+
+def _remote_root(path: str) -> str:
+    if ":" not in path:
+        return path
+    return f"{path.split(':', 1)[0]}:"
+
+
 def _build_rclone_command(sync_pair: SyncPair) -> list[str]:
-    binary = os.getenv("RCLONE_BINARY", "rclone")
-    command = [binary, sync_pair.mode, sync_pair.source_path, sync_pair.destination_path]
+    command = [_rclone_binary(), sync_pair.mode, sync_pair.source_path, sync_pair.destination_path]
 
     global_flags = os.getenv("RCLONE_GLOBAL_FLAGS", "--use-json-log --log-level INFO --stats 10s")
     if global_flags.strip():
         filtered_flags = [flag for flag in shlex.split(global_flags) if flag != "--stats-one-line-json"]
         command.extend(filtered_flags)
 
+    if sync_pair.backup_dir and sync_pair.mode == "sync":
+        command.extend(["--backup-dir", sync_pair.backup_dir])
+
+    if sync_pair.mode == "sync" and sync_pair.max_delete_count >= 0:
+        command.extend(["--max-delete", str(sync_pair.max_delete_count)])
+
     return command
+
+
+def _build_dry_run_command(command: list[str]) -> list[str]:
+    return [*command, "--dry-run", "--stats", "0"]
 
 
 def _fallback_command(sync_pair: SyncPair) -> list[str]:
@@ -308,6 +340,96 @@ def _progress_from_stats(stats: ParsedStats, *, timestamp: datetime) -> RunnerPr
     )
 
 
+def _check_local_source(path: str) -> str | None:
+    source_path = Path(path)
+    if not source_path.exists():
+        return f"Quelle nicht gefunden: {path}"
+    if not os.access(source_path, os.R_OK):
+        return f"Quelle nicht lesbar: {path}"
+    return None
+
+
+def _check_local_destination(path: str) -> str | None:
+    destination_path = Path(path)
+    probe = destination_path if destination_path.exists() else destination_path.parent
+    if not probe.exists():
+        return f"Ziel oder Zielordner nicht gefunden: {path}"
+    if not os.access(probe, os.W_OK):
+        return f"Ziel nicht beschreibbar: {probe}"
+    return None
+
+
+def _check_remote_access(path: str, *, role: str, require_exact: bool = False) -> str | None:
+    root = path if require_exact else _remote_root(path)
+    try:
+        result = _run_subprocess([_rclone_binary(), "lsf", root, "--max-depth", "1"], timeout=30)
+    except subprocess.TimeoutExpired:
+        return f"{role} nicht erreichbar: Timeout bei {root}"
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "Unbekannter rclone-Fehler").strip()
+        return f"{role} nicht erreichbar: {detail}"
+    return None
+
+
+def _run_preflight_checks(sync_pair: SyncPair, command: list[str]) -> PreflightResult:
+    source_error = (
+        _check_remote_access(sync_pair.source_path, role="Quelle", require_exact=True)
+        if _is_remote_path(sync_pair.source_path)
+        else _check_local_source(sync_pair.source_path)
+    )
+    if source_error:
+        return PreflightResult(ok=False, detail=source_error)
+
+    destination_error = (
+        _check_remote_access(sync_pair.destination_path, role="Ziel")
+        if _is_remote_path(sync_pair.destination_path)
+        else _check_local_destination(sync_pair.destination_path)
+    )
+    if destination_error:
+        return PreflightResult(ok=False, detail=destination_error)
+
+    if sync_pair.backup_dir:
+        backup_error = (
+            _check_remote_access(sync_pair.backup_dir, role="Backup-Ziel")
+            if _is_remote_path(sync_pair.backup_dir)
+            else _check_local_destination(sync_pair.backup_dir)
+        )
+        if backup_error:
+            return PreflightResult(ok=False, detail=backup_error)
+
+    if sync_pair.mode not in {"sync", "bisync"}:
+        return PreflightResult(ok=True, detail="Preflight erfolgreich. Keine Löschprüfung nötig.")
+
+    try:
+        dry_run = _run_subprocess(_build_dry_run_command(command), timeout=120)
+    except subprocess.TimeoutExpired:
+        return PreflightResult(ok=False, detail="Dry-Run zur Löschprüfung ist in ein Timeout gelaufen.")
+
+    dry_stats = _parse_stats(dry_run.stdout, dry_run.stderr, 1)
+    planned_deletions = dry_stats.files_deleted
+
+    if dry_run.returncode != 0:
+        detail = _extract_error_summary(dry_run.stdout, dry_run.stderr)
+        return PreflightResult(ok=False, detail=f"Dry-Run fehlgeschlagen: {detail}")
+
+    if planned_deletions > sync_pair.max_delete_count:
+        return PreflightResult(
+            ok=False,
+            detail=(
+                f"Schutzabbruch: Der Dry-Run hat {planned_deletions} geplante Löschungen erkannt. "
+                f"Erlaubt sind maximal {sync_pair.max_delete_count}."
+            ),
+            planned_deletions=planned_deletions,
+        )
+
+    detail = (
+        f"Preflight erfolgreich. Geplante Löschungen: {planned_deletions}. "
+        f"Schutzgrenze: {sync_pair.max_delete_count}."
+    )
+    return PreflightResult(ok=True, detail=detail, planned_deletions=planned_deletions)
+
+
 def _build_report(
     sync_pair: SyncPair,
     *,
@@ -342,6 +464,49 @@ def _build_report(
     )
 
 
+def _build_preflight_failure_result(
+    sync_pair: SyncPair,
+    *,
+    command: list[str],
+    started_at: datetime,
+    detail: str,
+) -> RunnerResult:
+    finished_at = utc_now()
+    duration_seconds = max(1, int((finished_at - started_at).total_seconds()))
+    command_string = " ".join(shlex.quote(part) for part in command)
+    log_path = _logs_dir() / f"{sync_pair.id}-{started_at.strftime('%Y%m%d%H%M%S')}.log"
+    report = (
+        f"Preflight für Sync '{sync_pair.name}' hat den Lauf vor dem Start abgebrochen. "
+        f"Grund: {detail}"
+    )
+    with log_path.open("w", encoding="utf-8") as log_file:
+        log_file.write(f"Command: {command_string}\n")
+        log_file.write(f"Started at: {started_at.isoformat()}\n")
+        log_file.write(f"Finished at: {finished_at.isoformat()}\n")
+        log_file.write(f"Duration seconds: {duration_seconds}\n")
+        log_file.write("Exit code: 2\n")
+        log_file.write("Status: error\n")
+        log_file.write("\n[report]\n")
+        log_file.write(report)
+        log_file.write("\n")
+    return RunnerResult(
+        status="error",
+        exit_code=2,
+        short_log=f"Preflight abgebrochen: {detail}",
+        report=report,
+        full_log_path=str(log_path),
+        command=command_string,
+        started_at=started_at,
+        finished_at=finished_at,
+        duration_seconds=duration_seconds,
+        files_transferred=0,
+        files_deleted=0,
+        error_count=1,
+        bytes_transferred=0,
+        average_speed_bytes_per_second=0,
+    )
+
+
 def run_sync_pair(
     sync_pair: SyncPair,
     *,
@@ -353,6 +518,15 @@ def run_sync_pair(
 
     if executable is None:
         command = _fallback_command(sync_pair)
+    else:
+        preflight = _run_preflight_checks(sync_pair, command)
+        if not preflight.ok:
+            return _build_preflight_failure_result(
+                sync_pair,
+                command=command,
+                started_at=started_at,
+                detail=preflight.detail,
+            )
 
     log_path = _logs_dir() / f"{sync_pair.id}-{started_at.strftime('%Y%m%d%H%M%S')}.log"
     command_string = " ".join(shlex.quote(part) for part in command)
@@ -422,7 +596,9 @@ def run_sync_pair(
                 average_speed_bytes_per_second=final_stats.average_speed_bytes_per_second,
                 eta_seconds=0 if return_code == 0 else final_stats.eta_seconds,
                 estimated_completion_at=finished_at if return_code == 0 else None,
-                percent_complete=100.0 if return_code == 0 and (final_stats.bytes_transferred > 0 or final_stats.files_transferred > 0) else final_stats.percent_complete,
+                percent_complete=100.0
+                if return_code == 0 and (final_stats.bytes_transferred > 0 or final_stats.files_transferred > 0)
+                else final_stats.percent_complete,
             )
         )
 

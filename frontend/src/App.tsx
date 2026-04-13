@@ -17,6 +17,8 @@ type SyncPairSummary = {
   schedule_interval_minutes: number;
   schedule_time: string | null;
   schedule_weekday: number | null;
+  max_delete_count: number;
+  backup_dir: string | null;
   next_run_at: string | null;
   last_run_at: string | null;
   created_at: string;
@@ -118,6 +120,8 @@ const initialFormState = {
   schedule_interval_minutes: 1440,
   schedule_time: "02:00",
   schedule_weekday: 0,
+  max_delete_count: 25,
+  backup_dir: "",
 };
 const initialLoginState = { username: "admin", password: "change-me-now" };
 const initialUserFormState = { username: "", password: "", role: "admin", is_active: true };
@@ -224,6 +228,8 @@ export function App() {
     schedule_interval_minutes: 1440,
     schedule_time: "02:00",
     schedule_weekday: 0,
+    max_delete_count: 25,
+    backup_dir: "",
   });
   const [browserField, setBrowserField] = useState<BrowserField>(null);
   const [browserMode, setBrowserMode] = useState<BrowserMode>("local");
@@ -482,6 +488,8 @@ export function App() {
       schedule_interval_minutes: selectedSyncPair.schedule_interval_minutes,
       schedule_time: selectedSyncPair.schedule_time ?? "02:00",
       schedule_weekday: selectedSyncPair.schedule_weekday ?? 0,
+      max_delete_count: selectedSyncPair.max_delete_count,
+      backup_dir: selectedSyncPair.backup_dir ?? "",
     });
   }, [selectedSyncPair]);
 
@@ -798,7 +806,9 @@ export function App() {
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="sidebar-brand">
-            <div className="sidebar-brand-mark">PS</div>
+            <div className="sidebar-brand-mark">
+              <img src="/icon-options/cloud-file-panel.svg" alt="pcloud-sync-app Icon" />
+            </div>
             <div>
               <p className="sidebar-brand-title">pcloud-sync-app</p>
               <p className="sidebar-brand-subtitle">Container Edition</p>
@@ -897,6 +907,8 @@ export function App() {
                   {formState.schedule_type === "weekly" ? (
                     <label><span>Wochentag</span><select value={formState.schedule_weekday} onChange={(event) => setFormState((current) => ({ ...current, schedule_weekday: Number(event.target.value) }))}>{weekdayOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                   ) : null}
+                  <label><span>Max. Löschungen</span><input min={0} type="number" value={formState.max_delete_count} onChange={(event) => setFormState((current) => ({ ...current, max_delete_count: Number(event.target.value) }))} /></label>
+                  <label className="path-field"><span>Backup-Verzeichnis für Löschungen</span><input placeholder="Optional, z. B. pcloud:/deleted-backup" value={formState.backup_dir} onChange={(event) => setFormState((current) => ({ ...current, backup_dir: event.target.value }))} /></label>
                   <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Sync speichern"}</button>
                 </form>
               </section>
@@ -951,6 +963,8 @@ export function App() {
                                   {scheduleEditState.schedule_type === "weekly" ? (
                                     <label><span>Wochentag</span><select value={scheduleEditState.schedule_weekday} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_weekday: Number(event.target.value) }))}>{weekdayOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
                                   ) : null}
+                                  <label><span>Max. Löschungen</span><input min={0} type="number" value={scheduleEditState.max_delete_count} onChange={(event) => setScheduleEditState((current) => ({ ...current, max_delete_count: Number(event.target.value) }))} /></label>
+                                  <label><span>Backup-Verzeichnis</span><input placeholder="Optional" value={scheduleEditState.backup_dir} onChange={(event) => setScheduleEditState((current) => ({ ...current, backup_dir: event.target.value }))} /></label>
                                   <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Zeitplan speichern"}</button>
                                 </form>
                               </section>

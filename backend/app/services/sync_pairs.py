@@ -70,6 +70,7 @@ def get_sync_pair(db: Session, sync_pair_id: str) -> SyncPair | None:
 
 def create_sync_pair(db: Session, payload: SyncPairCreate) -> SyncPair:
     values = payload.model_dump()
+    values["backup_dir"] = values.get("backup_dir") or None
     values["next_run_at"] = calculate_next_run(
         values["schedule_enabled"],
         values["schedule_type"],
@@ -86,6 +87,8 @@ def create_sync_pair(db: Session, payload: SyncPairCreate) -> SyncPair:
 
 def update_sync_pair(db: Session, sync_pair: SyncPair, payload: SyncPairUpdate) -> SyncPair:
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "backup_dir":
+            value = value or None
         setattr(sync_pair, field, value)
 
     sync_pair.next_run_at = calculate_next_run(

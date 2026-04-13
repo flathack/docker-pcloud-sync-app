@@ -112,6 +112,8 @@ def ensure_dev_schema() -> None:
         "schedule_interval_minutes": "ALTER TABLE sync_pairs ADD COLUMN schedule_interval_minutes INTEGER NOT NULL DEFAULT 1440",
         "schedule_time": "ALTER TABLE sync_pairs ADD COLUMN schedule_time VARCHAR(5)",
         "schedule_weekday": "ALTER TABLE sync_pairs ADD COLUMN schedule_weekday INTEGER",
+        "max_delete_count": "ALTER TABLE sync_pairs ADD COLUMN max_delete_count INTEGER NOT NULL DEFAULT 25",
+        "backup_dir": "ALTER TABLE sync_pairs ADD COLUMN backup_dir TEXT",
         "next_run_at": "ALTER TABLE sync_pairs ADD COLUMN next_run_at DATETIME",
         "last_run_at": "ALTER TABLE sync_pairs ADD COLUMN last_run_at DATETIME",
     }

@@ -1,0 +1,37 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="28" y1="24" x2="228" y2="232" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4CC3FF"/>
+      <stop offset="0.52" stop-color="#1F95E5"/>
+      <stop offset="1" stop-color="#0D5FA8"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="72" y1="58" x2="187" y2="194" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#EEF8FF"/>
+      <stop offset="1" stop-color="#C8E9FF"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="86" y1="106" x2="176" y2="106" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#42D6FF"/>
+      <stop offset="1" stop-color="#1F95E5"/>
+    </linearGradient>
+    <filter id="shadow" x="22" y="18" width="212" height="220" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="8"/>
+      <feGaussianBlur stdDeviation="10"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0352941 0 0 0 0 0.223529 0 0 0 0 0.403922 0 0 0 0.22 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="32" y="28" width="192" height="192" rx="44" fill="url(#bg)"/>
+    <path d="M79 70C79 63.3726 84.3726 58 91 58H165C171.627 58 177 63.3726 177 70V176C177 182.627 171.627 188 165 188H91C84.3726 188 79 182.627 79 176V70Z" fill="url(#panel)" fill-opacity="0.98"/>
+    <path d="M90 86C90 82.6863 92.6863 80 96 80H160C163.314 80 166 82.6863 166 86V97C166 100.314 163.314 103 160 103H96C92.6863 103 90 100.314 90 97V86Z" fill="#D8F0FF"/>
+    <path d="M96 122C96 118.686 98.6863 116 102 116H154C157.314 116 160 118.686 160 122V128C160 131.314 157.314 134 154 134H102C98.6863 134 96 131.314 96 128V122Z" fill="#D8F0FF"/>
+    <path d="M96 148C96 144.686 98.6863 142 102 142H142C145.314 142 148 144.686 148 148V154C148 157.314 145.314 160 142 160H102C98.6863 160 96 157.314 96 154V148Z" fill="#D8F0FF"/>
+    <path d="M86 106C86 100.477 90.4772 96 96 96H121.5C127.023 96 131.5 100.477 131.5 106C131.5 111.523 127.023 116 121.5 116H96C90.4772 116 86 111.523 86 106Z" fill="url(#flow)"/>
+    <path d="M124 106C124 100.477 128.477 96 134 96H154.5L170 106L154.5 116H134C128.477 116 124 111.523 124 106Z" fill="#0F7CCC"/>
+    <path d="M148 174C166.225 174 181 159.225 181 141" stroke="#6FD7FF" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="181" cy="141" r="11" fill="#6FD7FF"/>
+  </g>
+</svg>
