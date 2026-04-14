@@ -60,6 +60,7 @@ const initialFormState = {
   destination_path: "",
   mode: "sync",
   direction: "push",
+  enabled: true,
 };
 const initialLoginState = { username: "admin", password: "change-me-now" };
 
@@ -81,6 +82,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formState, setFormState] = useState(initialFormState);
+  const [editingSyncPairId, setEditingSyncPairId] = useState<string | null>(null);
   const [selectedSyncPairId, setSelectedSyncPairId] = useState<string | null>(null);
   const [runs, setRuns] = useState<SyncRunSummary[]>([]);
   const [runLoading, setRunLoading] = useState(false);
@@ -232,9 +234,14 @@ export function App() {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await apiFetch("/sync-pairs", { method: "POST", body: JSON.stringify(formState) });
-      if (!response.ok) throw new Error(`Anlegen fehlgeschlagen mit Status ${response.status}`);
+      const isEditing = editingSyncPairId !== null;
+      const response = await apiFetch(isEditing ? `/sync-pairs/${editingSyncPairId}` : "/sync-pairs", {
+        method: isEditing ? "PUT" : "POST",
+        body: JSON.stringify(formState),
+      });
+      if (!response.ok) throw new Error(`${isEditing ? "Speichern" : "Anlegen"} fehlgeschlagen mit Status ${response.status}`);
       setFormState(initialFormState);
+      setEditingSyncPairId(null);
       await loadSyncPairs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -243,11 +250,46 @@ export function App() {
     }
   }
 
+  function handleEditSyncPair(pair: SyncPairSummary) {
+    setEditingSyncPairId(pair.id);
+    setFormState({
+      name: pair.name,
+      source_path: pair.source_path,
+      destination_path: pair.destination_path,
+      mode: pair.mode,
+      direction: pair.direction,
+      enabled: pair.enabled,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleCancelEdit() {
+    setEditingSyncPairId(null);
+    setFormState(initialFormState);
+  }
+
   async function handleDeleteSyncPair(id: string) {
     try {
       const response = await apiFetch(`/sync-pairs/${id}`, { method: "DELETE" });
       if (!response.ok) throw new Error(`Loeschen fehlgeschlagen mit Status ${response.status}`);
+      if (editingSyncPairId === id) handleCancelEdit();
       setSelectedSyncPairId((current) => (current === id ? null : current));
+      await loadSyncPairs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    }
+  }
+
+  async function handleToggleSyncPair(pair: SyncPairSummary) {
+    try {
+      const response = await apiFetch(`/sync-pairs/${pair.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ enabled: !pair.enabled }),
+      });
+      if (!response.ok) throw new Error(`Aktivierung fehlgeschlagen mit Status ${response.status}`);
+      if (editingSyncPairId === pair.id) {
+        setFormState((current) => ({ ...current, enabled: !pair.enabled }));
+      }
       await loadSyncPairs();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
@@ -363,7 +405,13 @@ export function App() {
             </section>
 
             <section className="panel form-panel">
-              <div className="panel-header"><div><p className="eyebrow">Neuer Eintrag</p><h2>Sync-Paar anlegen</h2></div></div>
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">{editingSyncPairId ? "Bearbeiten" : "Neuer Eintrag"}</p>
+                  <h2>{editingSyncPairId ? "Sync-Paar bearbeiten" : "Sync-Paar anlegen"}</h2>
+                </div>
+                {editingSyncPairId ? <button className="table-button" type="button" onClick={handleCancelEdit}>Abbrechen</button> : null}
+              </div>
               <form className="sync-form" onSubmit={handleCreateSyncPair}>
                 <label><span>Name</span><input required value={formState.name} onChange={(event) => setFormState((current) => ({ ...current, name: event.target.value }))} /></label>
                 <label className="path-field">
@@ -385,7 +433,19 @@ export function App() {
                 </label>
                 <label><span>Modus</span><select value={formState.mode} onChange={(event) => setFormState((current) => ({ ...current, mode: event.target.value }))}><option value="sync">sync</option><option value="copy">copy</option><option value="bisync">bisync</option></select></label>
                 <label><span>Richtung</span><select value={formState.direction} onChange={(event) => setFormState((current) => ({ ...current, direction: event.target.value }))}><option value="push">push</option><option value="pull">pull</option><option value="bidirectional">bidirectional</option></select></label>
-                <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Sync-Paar speichern"}</button>
+                <label className="toggle-field">
+                  <span>Aktivierung</span>
+                  <button
+                    className={`toggle-button ${formState.enabled ? "is-enabled" : ""}`}
+                    type="button"
+                    aria-pressed={formState.enabled}
+                    onClick={() => setFormState((current) => ({ ...current, enabled: !current.enabled }))}
+                  >
+                    <span className="toggle-thumb" />
+                    <span>{formState.enabled ? "Aktiv" : "Deaktiviert"}</span>
+                  </button>
+                </label>
+                <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : editingSyncPairId ? "Aenderungen speichern" : "Sync-Paar speichern"}</button>
               </form>
             </section>
 
@@ -402,11 +462,14 @@ export function App() {
                         <tr key={pair.id}>
                           <td>{pair.name}</td><td>{pair.source_path}</td><td>{pair.destination_path}</td><td>{pair.mode}</td><td>{pair.direction}</td>
                           <td><span className={`badge ${pair.status}`}>{pair.status}</span></td>
-                          <td>{pair.last_status}</td><td>{pair.enabled ? "ja" : "nein"}</td>
+                          <td>{pair.last_status}</td>
+                          <td><span className={`badge ${pair.enabled ? "success" : "muted"}`}>{pair.enabled ? "aktiv" : "deaktiviert"}</span></td>
                           <td>
                             <div className="action-stack">
                               <button className="table-button" type="button" onClick={() => setSelectedSyncPairId(pair.id)}>Details</button>
-                              <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Laeuft..." : "Run now"}</button>
+                              <button className="table-button" type="button" onClick={() => handleEditSyncPair(pair)}>Bearbeiten</button>
+                              <button className="table-button" type="button" onClick={() => void handleToggleSyncPair(pair)}>{pair.enabled ? "Deaktivieren" : "Aktivieren"}</button>
+                              <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id || !pair.enabled} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Laeuft..." : "Run now"}</button>
                               <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Loeschen</button>
                             </div>
                           </td>
