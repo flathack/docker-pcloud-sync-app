@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pcloud-sync-app Icon-Auswahl</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: #0f1722;
+        color: #e6edf5;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #0f1722; }
+      main { width: min(1100px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 48px; }
+      h1 { margin: 0 0 10px; font-size: 2rem; }
+      p { margin: 0 0 24px; color: #9fb0c3; line-height: 1.6; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+      .card {
+        padding: 18px;
+        border-radius: 14px;
+        background: #16202b;
+        border: 1px solid #2a3948;
+      }
+      .card img {
+        display: block;
+        width: 124px;
+        height: 124px;
+        margin: 0 auto 14px;
+      }
+      .name { font-weight: 700; margin-bottom: 8px; }
+      code {
+        display: block;
+        padding: 10px 12px;
+        border-radius: 8px;
+        background: #0b1118;
+        color: #6fc3f2;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Icon-Auswahl</h1>
+      <p>Vier blaue Varianten für die pcloud-sync-app. Die erste zeigt eine Datei, die in eine Wolke geschossen wird.</p>
+      <section class="grid">
+        <article class="card">
+          <img src="/icon-options/cloud-file-launch.svg" alt="Datei fliegt in die Wolke" />
+          <div class="name">Datei in Wolke</div>
+          <code>/icon-options/cloud-file-launch.svg</code>
+        </article>
+        <article class="card">
+          <img src="/icon-options/cloud-sync-arrows.svg" alt="Wolke mit Sync-Pfeilen" />
+          <div class="name">Sync-Pfeile</div>
+          <code>/icon-options/cloud-sync-arrows.svg</code>
+        </article>
+        <article class="card">
+          <img src="/icon-options/cloud-file-panel.svg" alt="Datei und Admin-Panel" />
+          <div class="name">Datei und Panel</div>
+          <code>/icon-options/cloud-file-panel.svg</code>
+        </article>
+        <article class="card">
+          <img src="/icon-options/cloud-shield-transfer.svg" alt="Wolke mit Schutzschild und Transfer" />
+          <div class="name">Shield Transfer</div>
+          <code>/icon-options/cloud-shield-transfer.svg</code>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

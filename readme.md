@@ -432,7 +432,7 @@ rclone sync SOURCE DEST \
   --use-json-log \
   --log-level INFO \
   --stats 10s \
-  --stats-one-line-json
+  --stats 10s
 ```
 
 ### Empfehlung zur Auswertung
@@ -574,11 +574,13 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change-me-now
 
 RCLONE_CONFIG=./data/config/rclone/rclone.conf
-RCLONE_GLOBAL_FLAGS=--use-json-log --log-level INFO --stats 10s --stats-one-line-json
+RCLONE_GLOBAL_FLAGS=--use-json-log --log-level INFO --stats 10s
 
 TELEGRAM_ENABLED=false
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
+TELEGRAM_NOTIFY_ON_SUCCESS=false
+TELEGRAM_NOTIFY_ON_ERROR=true
 ```
 
 ### Persistenz

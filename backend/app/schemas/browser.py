@@ -12,3 +12,9 @@ class BrowserResponse(BaseModel):
     parent_path: str | None
     backend_type: str
     entries: list[BrowserEntry]
+
+
+class BrowserCreateDirectoryRequest(BaseModel):
+    path: str | None = None
+    backend_type: str = "local"
+    directory_name: str

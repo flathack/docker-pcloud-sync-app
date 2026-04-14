@@ -23,6 +23,15 @@ class SyncPair(Base):
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="idle")
     last_status: Mapped[str] = mapped_column(String(50), nullable=False, default="never")
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    schedule_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    schedule_type: Mapped[str] = mapped_column(String(50), nullable=False, default="daily")
+    schedule_interval_minutes: Mapped[int] = mapped_column(nullable=False, default=1440)
+    schedule_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    schedule_weekday: Mapped[int | None] = mapped_column(nullable=True)
+    max_delete_count: Mapped[int] = mapped_column(nullable=False, default=25)
+    backup_dir: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

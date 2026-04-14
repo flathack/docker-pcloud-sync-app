@@ -1,13 +1,25 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_current_user
+from app.api.deps import require_admin_user, require_current_user
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, UserSummary
-from app.schemas.browser import BrowserResponse
+from app.schemas.auth import (
+    LoginRequest,
+    UserCreateRequest,
+    UserPasswordUpdateRequest,
+    UserSummary,
+    UserUpdateRequest,
+)
+from app.schemas.browser import BrowserCreateDirectoryRequest, BrowserResponse
 from app.schemas.settings import RcloneConfigStatus, RcloneConfigTestRequest, RcloneConfigTestResult
+from app.schemas.settings import (
+    TelegramSettingsStatus,
+    TelegramSettingsUpdateRequest,
+    TelegramTestRequest,
+    TelegramTestResult,
+)
 from app.schemas.sync_pair import SyncPairCreate, SyncPairSummary, SyncPairUpdate
-from app.schemas.sync_run import SyncRunCreate, SyncRunSummary
+from app.schemas.sync_run import SyncRunCreate, SyncRunProgressStatus, SyncRunSummary
 from app.services import auth as auth_service
 from app.services import browser as browser_service
 from app.services import settings as settings_service
@@ -38,6 +50,25 @@ def browse(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.post("/browser/directories", response_model=BrowserResponse, status_code=status.HTTP_201_CREATED)
+def create_browser_directory(
+    payload: BrowserCreateDirectoryRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> BrowserResponse:
+    try:
+        return browser_service.create_directory(
+            payload.path,
+            payload.directory_name,
+            backend_type=payload.backend_type,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
 @router.post("/auth/login", response_model=UserSummary)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> UserSummary:
     user = auth_service.authenticate_user(db, payload.username, payload.password)
@@ -57,6 +88,78 @@ def logout(request: Request) -> Response:
 @router.get("/auth/me", response_model=UserSummary)
 def auth_me(current_user: UserSummary = Depends(require_current_user)) -> UserSummary:
     return current_user
+
+
+@router.get("/users", response_model=list[UserSummary])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> list[UserSummary]:
+    return auth_service.list_users(db)
+
+
+@router.post("/users", response_model=UserSummary, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: UserCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> UserSummary:
+    try:
+        return auth_service.create_user(
+            db,
+            payload.username,
+            payload.password,
+            role=payload.role,
+            is_active=payload.is_active,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.put("/users/{username}", response_model=UserSummary)
+def update_user(
+    username: str,
+    payload: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> UserSummary:
+    user = auth_service.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
+    if current_user.username == username and payload.is_active is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Eigener Benutzer kann nicht deaktiviert werden")
+    return auth_service.update_user(db, user, role=payload.role, is_active=payload.is_active)
+
+
+@router.put("/users/{username}/password", response_model=UserSummary)
+def update_user_password(
+    username: str,
+    payload: UserPasswordUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> UserSummary:
+    user = auth_service.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
+    try:
+        return auth_service.update_user_password(db, user, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/users/{username}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_admin_user),
+) -> Response:
+    user = auth_service.get_user_by_username(db, username)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Benutzer nicht gefunden")
+    if current_user.username == username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Eigener Benutzer kann nicht gelöscht werden")
+    auth_service.delete_user(db, user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/sync-pairs", response_model=list[SyncPairSummary])
@@ -130,6 +233,15 @@ def list_sync_pair_runs(
     return sync_run_service.list_runs_for_sync_pair(db, sync_pair_id)
 
 
+@router.get("/runs", response_model=list[SyncRunSummary])
+def list_runs(
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> list[SyncRunSummary]:
+    return sync_run_service.list_runs(db, limit=min(max(limit, 1), 250))
+
+
 @router.post(
     "/sync-pairs/{sync_pair_id}/run",
     response_model=SyncRunSummary,
@@ -145,7 +257,7 @@ def start_sync_pair_run(
     if sync_pair is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync-Paar nicht gefunden")
 
-    return sync_run_service.start_sync_run(db, sync_pair, trigger_type=payload.trigger_type)
+    return sync_run_service.start_sync_run_async(db, sync_pair, trigger_type=payload.trigger_type)
 
 
 @router.get("/runs/{run_id}", response_model=SyncRunSummary)
@@ -174,6 +286,22 @@ def get_run_log(
     return {"log": sync_run_service.read_run_log(run)}
 
 
+@router.get("/runs/{run_id}/progress", response_model=SyncRunProgressStatus)
+def get_run_progress(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> SyncRunProgressStatus:
+    run = sync_run_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
+
+    progress = sync_run_service.get_run_progress(run_id)
+    if progress is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Für diesen Run sind keine Live-Daten verfügbar")
+    return progress
+
+
 @router.get("/settings/rclone/status", response_model=RcloneConfigStatus)
 def get_rclone_status(
     current_user: UserSummary = Depends(require_current_user),
@@ -199,3 +327,32 @@ def test_rclone_config(
     current_user: UserSummary = Depends(require_current_user),
 ) -> RcloneConfigTestResult:
     return settings_service.test_rclone_remote(payload.remote_name)
+
+
+@router.get("/settings/telegram", response_model=TelegramSettingsStatus)
+def get_telegram_settings(
+    current_user: UserSummary = Depends(require_current_user),
+) -> TelegramSettingsStatus:
+    return settings_service.get_telegram_settings_status()
+
+
+@router.put("/settings/telegram", response_model=TelegramSettingsStatus)
+def save_telegram_settings(
+    payload: TelegramSettingsUpdateRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> TelegramSettingsStatus:
+    return settings_service.save_telegram_settings(
+        enabled=payload.enabled,
+        bot_token=payload.bot_token,
+        chat_id=payload.chat_id,
+        notify_on_success=payload.notify_on_success,
+        notify_on_error=payload.notify_on_error,
+    )
+
+
+@router.post("/settings/test-telegram", response_model=TelegramTestResult)
+def test_telegram_settings(
+    payload: TelegramTestRequest,
+    current_user: UserSummary = Depends(require_current_user),
+) -> TelegramTestResult:
+    return settings_service.test_telegram(payload.message)

@@ -1,0 +1,31 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="222" y2="226" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4BC5FF"/>
+      <stop offset="0.5" stop-color="#1F96E6"/>
+      <stop offset="1" stop-color="#0B5CA3"/>
+    </linearGradient>
+    <linearGradient id="cloud" x1="91" y1="67" x2="174" y2="132" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7FCFF"/>
+      <stop offset="1" stop-color="#CFE9FF"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="111" y1="121" x2="154" y2="176" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8CE8FF"/>
+      <stop offset="1" stop-color="#1F96E6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="20" y="20" width="216" height="216" rx="48" fill="url(#bg)"/>
+  <circle cx="74" cy="74" r="10" fill="#7BD9FF" fill-opacity="0.7"/>
+  <circle cx="186" cy="60" r="7" fill="#7BD9FF" fill-opacity="0.6"/>
+  <path d="M84 101C84 84.9837 96.9837 72 113 72C122.461 72 130.864 76.5274 136.157 83.537C139.268 81.2893 143.091 80 147.215 80C157.514 80 165.942 88.0368 166.567 98.1794C176.539 99.0749 184.344 107.454 184.344 117.66C184.344 128.462 175.587 137.219 164.785 137.219H105C93.402 137.219 84 127.817 84 116.219V101Z" fill="url(#cloud)"/>
+  <path d="M116 160L128 121L140 160H116Z" fill="url(#trail)"/>
+  <g transform="translate(109 120) rotate(-12 19 33)">
+    <path d="M0 9C0 4.02944 4.02944 0 9 0H28L38 10V57C38 61.9706 33.9706 66 29 66H9C4.02944 66 0 61.9706 0 57V9Z" fill="#F8FCFF"/>
+    <path d="M28 0V10H38" fill="#D8ECFF"/>
+    <path d="M28 0V10H38" stroke="#A4D6FF" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M9 27H29" stroke="#1592E6" stroke-width="4" stroke-linecap="round"/>
+    <path d="M9 38H24" stroke="#1592E6" stroke-width="4" stroke-linecap="round" opacity="0.75"/>
+    <path d="M21 70C24.3333 63.3333 28.8667 58.1333 34.6 54.4C40.3333 50.6667 47.4667 48.5333 56 48" stroke="#7BE4FF" stroke-width="7" stroke-linecap="round"/>
+    <path d="M50 36L67 48L50 60" stroke="#7BE4FF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

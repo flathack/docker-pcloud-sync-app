@@ -13,8 +13,12 @@ services:
       DEFAULT_TIMEZONE: Europe/Berlin
       FILE_BROWSER_ROOTS: /app/backend/data,/app/data/config,/mnt/nas
       RCLONE_CONFIG: /app/data/config/rclone/rclone.conf
-      RCLONE_GLOBAL_FLAGS: --use-json-log --log-level INFO --stats 10s --stats-one-line-json
+      RCLONE_GLOBAL_FLAGS: --use-json-log --log-level INFO --stats 10s
       TELEGRAM_ENABLED: "false"
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+      TELEGRAM_NOTIFY_ON_SUCCESS: "false"
+      TELEGRAM_NOTIFY_ON_ERROR: "true"
     volumes:
       - /volume1/docker/pcloud-sync/backend-data:/app/backend/data
       - /volume1/docker/pcloud-sync/logs:/app/data/logs
