@@ -259,6 +259,13 @@ export function App() {
   const successfulRuns = recentRuns.filter((run) => run.status === "success").length;
   const totalBytes = recentRuns.reduce((sum, run) => sum + run.bytes_transferred, 0);
   const totalFiles = recentRuns.reduce((sum, run) => sum + run.files_transferred, 0);
+  const activeRuns = Array.from(
+    new Map(
+      [...recentRuns, ...runs]
+        .filter((run) => run.status === "running")
+        .map((run) => [run.id, run]),
+    ).values(),
+  );
 
   async function checkSession() {
     try {
@@ -923,7 +930,49 @@ export function App() {
               <article className="stat-card accent-green"><span>Transfer-Volumen</span><strong>{formatBytes(totalBytes)}</strong><p>Gesamt über die letzte Run-Serie</p></article>
               <article className="stat-card accent-slate"><span>Dateien bewegt</span><strong>{totalFiles}</strong><p>Transferierte Dateien aus Reports</p></article>
             </section>
+            {activeRuns.length > 0 ? (
+              <section className="running-sync-banner">
+                <div className="panel-header">
+                  <div>
+                    <p className="eyebrow">Live jetzt</p>
+                    <h2>{activeRuns.length === 1 ? "Aktiver Kopiervorgang" : "Aktive Kopiervorgaenge"}</h2>
+                  </div>
+                  <span className="badge running">{activeRuns.length} aktiv</span>
+                </div>
+                <div className="running-sync-grid">
+                  {activeRuns.map((run) => {
+                    const pair = syncPairs.find((item) => item.id === run.sync_pair_id) ?? null;
+                    const progress = runProgressById[run.id];
+                    const percent = progress?.percent_complete ?? null;
+                    const speedValue = progress?.average_speed_bytes_per_second ?? run.average_speed_bytes_per_second;
+                    const bytesValue = progress?.bytes_transferred ?? run.bytes_transferred;
+                    const filesValue = progress?.files_transferred ?? run.files_transferred;
+                    const finishEstimate = progress?.estimated_completion_at ?? null;
 
+                    return (
+                      <article className="running-sync-card" key={run.id}>
+                        <div className="running-sync-head">
+                          <div>
+                            <strong>{pair?.name ?? "Unbekanntes Sync-Paar"}</strong>
+                            <p>{pair ? `${pair.source_path} -> ${pair.destination_path}` : run.short_log}</p>
+                          </div>
+                          <button className="table-button" type="button" onClick={() => { setSelectedSyncPairId(run.sync_pair_id); setSelectedRunId(run.id); }}>
+                            Details
+                          </button>
+                        </div>
+                        <div className="running-sync-metrics">
+                          <article><span>Status</span><strong>{percent !== null ? formatPercent(percent) : "Laeuft"}</strong></article>
+                          <article><span>Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
+                          <article><span>Dateien</span><strong>{filesValue}{progress?.total_files ? ` / ${progress.total_files}` : ""}</strong></article>
+                          <article><span>Transfer</span><strong>{formatBytes(bytesValue)}{progress?.total_bytes ? ` / ${formatBytes(progress.total_bytes)}` : ""}</strong></article>
+                          <article><span>ETA</span><strong>{finishEstimate ? formatDateTime(finishEstimate) : "Wird berechnet"}</strong></article>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ) : null}
             {createOpen ? (
               <section className="panel form-panel">
                 <div className="panel-header"><div><p className="eyebrow">{editingSyncPairId ? "Bearbeiten" : "Neuer Eintrag"}</p><h2>{editingSyncPairId ? "Sync-Paar bearbeiten" : "Sync-Paar anlegen"}</h2></div>{editingSyncPairId ? <button className="table-button" type="button" onClick={handleCancelEdit}>Abbrechen</button> : null}</div>
@@ -1317,6 +1366,8 @@ export function App() {
     </main>
   );
 }
+
+
 
 
 
