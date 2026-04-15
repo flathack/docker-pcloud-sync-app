@@ -755,7 +755,7 @@ export function App() {
   async function handleRcloneTest() {
     try {
       setTestLoading(true);
-      const remoteName = testRemote || rcloneStatus?.remotes[0] ?? null;
+      const remoteName = testRemote || (rcloneStatus?.remotes[0] ?? null);
       const response = await apiFetch("/settings/rclone/test", {
         method: "POST",
         body: JSON.stringify({ remote_name: remoteName }),
