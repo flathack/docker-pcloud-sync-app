@@ -18,7 +18,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
-    rclone \
+    unzip \
+    && curl -fsSL https://rclone.org/install.sh | bash \
+    && apt-get purge -y unzip \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt /app/backend/requirements.txt

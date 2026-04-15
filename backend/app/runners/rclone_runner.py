@@ -402,7 +402,7 @@ def _run_preflight_checks(sync_pair: SyncPair, command: list[str]) -> PreflightR
         return PreflightResult(ok=True, detail="Preflight erfolgreich. Keine Löschprüfung nötig.")
 
     try:
-        dry_run = _run_subprocess(_build_dry_run_command(command), timeout=120)
+        dry_run = _run_subprocess(_build_dry_run_command(command), timeout=600)
     except subprocess.TimeoutExpired:
         return PreflightResult(ok=False, detail="Dry-Run zur Löschprüfung ist in ein Timeout gelaufen.")
 
