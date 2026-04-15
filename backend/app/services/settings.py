@@ -232,7 +232,7 @@ def test_telegram(message: str | None = None) -> TelegramTestResult:
     chat_id = str(settings.get("chat_id", "") or "")
     if not bot_token or not chat_id:
         return TelegramTestResult(ok=False, detail="Bitte zuerst Bot-Token und Chat-ID hinterlegen.")
-    text = message or "Testnachricht aus pcloud-sync-app. Telegram ist erreichbar."
+    text = message or "Testnachricht aus SyncForge. Telegram ist erreichbar."
     return _send_telegram_message(bot_token, chat_id, text)
 
 

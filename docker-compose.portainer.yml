@@ -1,7 +1,7 @@
 services:
-  pcloud-sync-app:
-    image: ghcr.io/flathack/docker-pcloud-sync-app:latest
-    container_name: pcloud-sync-app
+  syncforge:
+    image: ghcr.io/flathack/docker-syncforge:latest
+    container_name: syncforge
     ports:
       - "8000:8000"
     environment:
@@ -20,8 +20,8 @@ services:
       TELEGRAM_NOTIFY_ON_SUCCESS: "false"
       TELEGRAM_NOTIFY_ON_ERROR: "true"
     volumes:
-      - /volume1/docker/pcloud-sync/backend-data:/app/backend/data
-      - /volume1/docker/pcloud-sync/logs:/app/data/logs
-      - /volume1/docker/pcloud-sync/config:/app/data/config
+      - /volume1/docker/syncforge/backend-data:/app/backend/data
+      - /volume1/docker/syncforge/logs:/app/data/logs
+      - /volume1/docker/syncforge/config:/app/data/config
       - /volume1/YOUR_NAS_SHARE:/mnt/nas
     restart: unless-stopped

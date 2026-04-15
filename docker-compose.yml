@@ -1,9 +1,9 @@
 services:
-  pcloud-sync-app:
+  syncforge:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: pcloud-sync-app
+    container_name: syncforge
     ports:
       - "8000:8000"
     environment:

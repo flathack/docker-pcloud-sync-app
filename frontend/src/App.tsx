@@ -763,7 +763,7 @@ export function App() {
       setTelegramTesting(true);
       const response = await apiFetch("/settings/test-telegram", {
         method: "POST",
-        body: JSON.stringify({ message: "Testnachricht aus dem pcloud-sync-app Settings-Bereich." }),
+        body: JSON.stringify({ message: "Testnachricht aus dem SyncForge Settings-Bereich." }),
       });
       if (!response.ok) throw new Error(`Telegram-Test fehlgeschlagen mit Status ${response.status}`);
       setTelegramTestResult((await response.json()) as TelegramTestResult);
@@ -843,7 +843,7 @@ export function App() {
       <main className="page-shell auth-shell">
         <section className="hero auth-hero">
           <div>
-            <p className="eyebrow">PCloud Sync Docker App</p>
+            <p className="eyebrow">SyncForge</p>
             <h1>Anmeldung für das Sync-Dashboard</h1>
             <p className="hero-copy">Melde dich mit dem lokalen Admin-Benutzer an, um Sync-Paare, Reports und Zeitpläne zu verwalten.</p>
           </div>
@@ -867,10 +867,10 @@ export function App() {
         <div className="sidebar-top">
           <div className="sidebar-brand">
             <div className="sidebar-brand-mark">
-              <img src="/icon-options/cloud-file-panel.svg" alt="pcloud-sync-app Icon" />
+              <img src="/icon-options/cloud-file-panel.svg" alt="SyncForge Icon" />
             </div>
             <div>
-              <p className="sidebar-brand-title">pcloud-sync-app</p>
+              <p className="sidebar-brand-title">SyncForge</p>
               <p className="sidebar-brand-subtitle">Container Edition</p>
             </div>
           </div>
@@ -895,7 +895,7 @@ export function App() {
               <p className="sidebar-user-name">{currentUser.username}</p>
               <p className="sidebar-copy">Angemeldet und aktiv</p>
             </div>
-            <a className="sidebar-help-link" href="https://flathack.github.io/help/pcloud-sync-app-hilfe.html" target="_blank" rel="noreferrer">Hilfe öffnen</a>
+            <a className="sidebar-help-link" href="https://flathack.github.io/help/syncforge-hilfe.html" target="_blank" rel="noreferrer">Hilfe öffnen</a>
           </section>
         </div>
 

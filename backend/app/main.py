@@ -19,7 +19,7 @@ from app.models.user import User
 from app.services.auth import create_admin_user
 from app.services.sync_runs import start_sync_run
 
-app = FastAPI(title="PCloud Sync Docker App", version="0.1.0")
+app = FastAPI(title="SyncForge", version="0.1.0")
 _scheduler_started = False
 
 app.add_middleware(

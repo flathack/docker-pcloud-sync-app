@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/docker-pcloud-sync-app
+  IMAGE_NAME: ${{ github.repository_owner }}/docker-syncforge
 
 jobs:
   docker:

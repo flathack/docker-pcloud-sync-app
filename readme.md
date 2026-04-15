@@ -1,4 +1,4 @@
-# PCloud Sync Docker App
+# SyncForge
 
 ## Aktueller Stand
 
@@ -35,15 +35,15 @@ Fuer wiederholbare Updates ist das Projekt jetzt auf einen Registry-basierten Ab
 Die Action veroeffentlicht Images nach diesem Muster:
 
 ```text
-ghcr.io/GITHUB_OWNER/docker-pcloud-sync-app:latest
-ghcr.io/GITHUB_OWNER/docker-pcloud-sync-app:main
-ghcr.io/GITHUB_OWNER/docker-pcloud-sync-app:sha-...
+ghcr.io/GITHUB_OWNER/docker-syncforge:latest
+ghcr.io/GITHUB_OWNER/docker-syncforge:main
+ghcr.io/GITHUB_OWNER/docker-syncforge:sha-...
 ```
 
 Mit deinem Account ergibt sich also spaeter z. B.:
 
 ```text
-ghcr.io/flathack/docker-pcloud-sync-app:latest
+ghcr.io/flathack/docker-syncforge:latest
 ```
 
 ### Portainer-Stack
@@ -540,11 +540,11 @@ CMD ["uvicorn", "app.main:app", "--app-dir", "/app/backend", "--host", "0.0.0.0"
 version: "3.9"
 
 services:
-  pcloud-sync-app:
+  syncforge:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: pcloud-sync-app
+    container_name: syncforge
     ports:
       - "8000:8000"
     environment:
@@ -595,7 +595,7 @@ TELEGRAM_NOTIFY_ON_ERROR=true
 ## Verzeichnisstruktur
 
 ```text
-PCloud-Sync-Docker-App/
+SyncForge/
   backend/
     app/
       api/
