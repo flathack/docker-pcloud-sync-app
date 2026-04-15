@@ -96,7 +96,7 @@ type RunLogResponse = { log: string };
 type UserAdminSummary = { username: string; role: string; is_active: boolean; created_at: string };
 type BrowserField = "source_path" | "destination_path" | null;
 type BrowserMode = "local" | "remote";
-type AppSection = "dashboard" | "users" | "settings";
+type AppSection = "dashboard" | "sync-targets" | "users" | "settings";
 type ThemeMode = "light" | "dark";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -197,6 +197,28 @@ function describeSchedule(pair: Pick<SyncPairSummary, "schedule_enabled" | "sche
   return `Täglich um ${pair.schedule_time ?? "00:00"} Uhr`;
 }
 
+function extractRemoteName(path: string): string {
+  const colonIndex = path.indexOf(":");
+  if (colonIndex > 0 && !path.startsWith("/")) return path.substring(0, colonIndex);
+  return "Lokal";
+}
+
+function buildDailyTransferData(allRuns: SyncRunSummary[], days: number = 14): { label: string; bytes: number }[] {
+  const result: { label: string; bytes: number }[] = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(now);
+    day.setDate(day.getDate() - i);
+    const dayStr = day.toISOString().slice(0, 10);
+    const dayLabel = day.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+    const dayBytes = allRuns
+      .filter((run) => run.started_at?.slice(0, 10) === dayStr && run.status !== "running")
+      .reduce((sum, run) => sum + run.bytes_transferred, 0);
+    result.push({ label: dayLabel, bytes: dayBytes });
+  }
+  return result;
+}
+
 export function App() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     if (typeof window === "undefined") return "light";
@@ -210,6 +232,7 @@ export function App() {
   const [users, setUsers] = useState<UserAdminSummary[]>([]);
   const [syncPairs, setSyncPairs] = useState<SyncPairSummary[]>([]);
   const [recentRuns, setRecentRuns] = useState<SyncRunSummary[]>([]);
+  const [chartRuns, setChartRuns] = useState<SyncRunSummary[]>([]);
   const [runs, setRuns] = useState<SyncRunSummary[]>([]);
   const [selectedSyncPairId, setSelectedSyncPairId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -218,6 +241,7 @@ export function App() {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [runLoading, setRunLoading] = useState(false);
   const [runActionId, setRunActionId] = useState<string | null>(null);
+  const [quickStartPairId, setQuickStartPairId] = useState<string>("");
   const [runLogLoading, setRunLogLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -295,11 +319,17 @@ export function App() {
     setRecentRuns((await response.json()) as SyncRunSummary[]);
   }
 
+  async function loadChartRuns() {
+    const response = await apiFetch("/runs?limit=250", { method: "GET" });
+    if (!response.ok) throw new Error(`Chart-Runs laden fehlgeschlagen mit Status ${response.status}`);
+    setChartRuns((await response.json()) as SyncRunSummary[]);
+  }
+
   async function loadDashboardData() {
     try {
       setDashboardLoading(true);
       setError(null);
-      await Promise.all([loadSyncPairs(), loadRecentRuns(), loadRcloneStatus()]);
+      await Promise.all([loadSyncPairs(), loadRecentRuns(), loadChartRuns(), loadRcloneStatus()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
@@ -472,6 +502,7 @@ export function App() {
       setUsers([]);
       setSyncPairs([]);
       setRecentRuns([]);
+      setChartRuns([]);
       setRuns([]);
       setSelectedSyncPairId(null);
       setSelectedRunId(null);
@@ -564,6 +595,7 @@ export function App() {
       setCurrentUser(null);
       setSyncPairs([]);
       setRecentRuns([]);
+      setChartRuns([]);
       setRuns([]);
       setSelectedSyncPairId(null);
       setSelectedRunId(null);
@@ -884,6 +916,7 @@ export function App() {
             </div>
             <nav className="sidebar-nav sidebar-card-nav">
               <button className={`sidebar-link ${activeSection === "dashboard" ? "active" : ""}`} type="button" onClick={() => setActiveSection("dashboard")}>Dashboard</button>
+              <button className={`sidebar-link ${activeSection === "sync-targets" ? "active" : ""}`} type="button" onClick={() => setActiveSection("sync-targets")}>Sync-Ziele</button>
               {currentUser.role === "admin" ? <button className={`sidebar-link ${activeSection === "users" ? "active" : ""}`} type="button" onClick={() => setActiveSection("users")}>Users</button> : null}
               <button className={`sidebar-link ${activeSection === "settings" ? "active" : ""}`} type="button" onClick={() => setActiveSection("settings")}>Settings</button>
             </nav>
@@ -917,12 +950,9 @@ export function App() {
             <section className="hero hero-rich">
               <div>
                 <p className="eyebrow">Dashboard</p>
-                <h1>Sync-Zentrale für NAS und pCloud</h1>
-                <p className="hero-copy">Hier siehst du, was zuletzt passiert ist, planst automatische Läufe und öffnest Berichte pro Sync.</p>
+                <h1>Sync-Zentrale</h1>
+                <p className="hero-copy">Hier siehst du, was zuletzt passiert ist, und startest manuelle Sync-Läufe.</p>
                 {!rcloneStatus?.exists ? <p className="state error">rclone ist noch nicht konfiguriert. Richte die Verbindung in den Settings ein.</p> : null}
-              </div>
-              <div className="hero-actions">
-                <button className="primary-button" type="button" onClick={() => setCreateOpen((current) => !current)}>{createOpen ? "Dialog schließen" : "Neuen Sync anlegen"}</button>
               </div>
             </section>
 
@@ -932,6 +962,35 @@ export function App() {
               <article className="stat-card accent-green"><span>Transfer-Volumen</span><strong>{formatBytes(totalBytes)}</strong><p>Gesamt über die letzte Run-Serie</p></article>
               <article className="stat-card accent-slate"><span>Dateien bewegt</span><strong>{totalFiles}</strong><p>Transferierte Dateien aus Reports</p></article>
             </section>
+
+            {(() => {
+              const dailyData = buildDailyTransferData(chartRuns);
+              const maxBytes = Math.max(...dailyData.map((d) => d.bytes), 1);
+              return (
+                <section className="panel">
+                  <div className="panel-header"><div><p className="eyebrow">Transfer</p><h2>Datenvolumen der letzten 14 Tage</h2></div></div>
+                  <div className="bar-chart-shell">
+                    <svg className="bar-chart" viewBox="0 0 700 220" preserveAspectRatio="none">
+                      {dailyData.map((d, i) => {
+                        const barWidth = 700 / dailyData.length * 0.65;
+                        const gap = 700 / dailyData.length * 0.35;
+                        const x = i * (barWidth + gap) + gap / 2;
+                        const barHeight = Math.max(2, (d.bytes / maxBytes) * 180);
+                        return (
+                          <g key={d.label}>
+                            <rect className="bar-chart-bar" x={x} y={180 - barHeight} width={barWidth} height={barHeight} rx={3} />
+                            <title>{d.label}: {formatBytes(d.bytes)}</title>
+                            <text className="bar-chart-label" x={x + barWidth / 2} y={200} textAnchor="middle">{d.label}</text>
+                            {d.bytes > 0 ? <text className="bar-chart-value" x={x + barWidth / 2} y={180 - barHeight - 6} textAnchor="middle">{formatBytes(d.bytes)}</text> : null}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </section>
+              );
+            })()}
+
             {activeRuns.length > 0 ? (
               <section className="running-sync-banner">
                 <div className="panel-header">
@@ -945,6 +1004,8 @@ export function App() {
                   {activeRuns.map((run) => {
                     const pair = syncPairs.find((item) => item.id === run.sync_pair_id) ?? null;
                     const progress = runProgressById[run.id];
+                    const progressPoints = progress?.history ?? [];
+                    const speedPolyline = buildSpeedPolyline(progressPoints);
                     const percent = progress?.percent_complete ?? null;
                     const speedValue = progress?.average_speed_bytes_per_second ?? run.average_speed_bytes_per_second;
                     const bytesValue = progress?.bytes_transferred ?? run.bytes_transferred;
@@ -956,14 +1017,17 @@ export function App() {
                         <div className="running-sync-head">
                           <div>
                             <strong>{pair?.name ?? "Unbekanntes Sync-Paar"}</strong>
-                            <p>{pair ? `${pair.source_path} -> ${pair.destination_path}` : run.short_log}</p>
+                            <p>{pair ? `${pair.source_path} → ${pair.destination_path}` : run.short_log}</p>
                           </div>
-                          <button className="table-button" type="button" onClick={() => { setSelectedSyncPairId(run.sync_pair_id); setSelectedRunId(run.id); }}>
-                            Details
-                          </button>
+                          <strong className="running-sync-percent">{percent !== null ? formatPercent(percent) : "Läuft"}</strong>
+                        </div>
+                        <div className="progress-bar-shell" aria-hidden="true">
+                          <div className="progress-bar-fill" style={{ width: `${Math.max(4, percent ?? 6)}%` }} />
+                          <svg className="progress-speed-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+                            <polyline points={speedPolyline} />
+                          </svg>
                         </div>
                         <div className="running-sync-metrics">
-                          <article><span>Status</span><strong>{percent !== null ? formatPercent(percent) : "Laeuft"}</strong></article>
                           <article><span>Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
                           <article><span>Dateien</span><strong>{filesValue}{progress?.total_files ? ` / ${progress.total_files}` : ""}</strong></article>
                           <article><span>Transfer</span><strong>{formatBytes(bytesValue)}{progress?.total_bytes ? ` / ${formatBytes(progress.total_bytes)}` : ""}</strong></article>
@@ -975,6 +1039,33 @@ export function App() {
                 </div>
               </section>
             ) : null}
+
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Manueller Start</p><h2>Sync-Job starten</h2></div></div>
+              <div className="inline-actions">
+                <select value={quickStartPairId} onChange={(event) => setQuickStartPairId(event.target.value)}>
+                  <option value="">Sync-Paar wählen...</option>
+                  {syncPairs.filter((p) => p.enabled).map((pair) => <option key={pair.id} value={pair.id}>{pair.name} ({pair.source_path} → {pair.destination_path})</option>)}
+                </select>
+                <button className="primary-button" type="button" disabled={!quickStartPairId || !!runActionId} onClick={() => { if (quickStartPairId) void handleStartRun(quickStartPairId); }}>{runActionId ? "Wird gestartet..." : "Starten"}</button>
+              </div>
+            </section>
+
+            {error ? <p className="state error">Fehler: {error}</p> : null}
+          </>
+        ) : activeSection === "sync-targets" ? (
+          <>
+            <section className="hero hero-rich">
+              <div>
+                <p className="eyebrow">Sync-Ziele</p>
+                <h1>Alle Sync-Paare</h1>
+                <p className="hero-copy">Deine Sync-Jobs, gruppiert nach Quell-Remote.</p>
+              </div>
+              <div className="hero-actions">
+                <button className="primary-button" type="button" onClick={() => setCreateOpen((current) => !current)}>{createOpen ? "Dialog schließen" : "Neuen Sync anlegen"}</button>
+              </div>
+            </section>
+
             {createOpen ? (
               <section className="panel form-panel">
                 <div className="panel-header"><div><p className="eyebrow">{editingSyncPairId ? "Bearbeiten" : "Neuer Eintrag"}</p><h2>{editingSyncPairId ? "Sync-Paar bearbeiten" : "Sync-Paar anlegen"}</h2></div>{editingSyncPairId ? <button className="table-button" type="button" onClick={handleCancelEdit}>Abbrechen</button> : null}</div>
@@ -1017,155 +1108,161 @@ export function App() {
               </section>
             ) : null}
 
-            {error ? <p className="state error">Fehler: {error}</p> : null}
+            {dashboardLoading ? <p className="state">Lade Sync-Paare...</p> : null}
+            {!dashboardLoading && syncPairs.length === 0 ? <p className="state">Noch keine Sync-Paare vorhanden.</p> : null}
+            {!dashboardLoading && syncPairs.length > 0 ? (() => {
+              const grouped: Record<string, SyncPairSummary[]> = {};
+              for (const pair of syncPairs) {
+                const key = extractRemoteName(pair.source_path);
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(pair);
+              }
+              return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([remote, pairs]) => (
+                <section className="panel sync-group" key={remote}>
+                  <div className="panel-header"><div><p className="eyebrow">Quelle</p><h2>{remote}</h2></div><span className="badge muted">{pairs.length} {pairs.length === 1 ? "Paar" : "Paare"}</span></div>
+                  <div className="sync-list">
+                    {pairs.map((pair) => {
+                      const isOpen = selectedSyncPairId === pair.id;
+                      return (
+                        <article className={`sync-row ${isOpen ? "open" : ""}`} key={pair.id}>
+                          <button className="sync-row-summary" type="button" onClick={() => toggleSyncPair(pair.id)}>
+                            <div className="sync-row-main">
+                              <strong>{pair.name}</strong>
+                              <span>{describeSchedule(pair)}</span>
+                            </div>
+                            <div className="sync-row-meta">
+                              <span>{pair.source_path}</span>
+                              <span>{pair.destination_path}</span>
+                              <span>{formatDateTime(pair.last_run_at)}</span>
+                              <span>{formatDateTime(pair.next_run_at)}</span>
+                              <span className={`badge ${pair.status === "running" ? "running" : pair.last_status === "error" ? "error" : "idle"}`}>{pair.status === "running" ? "running" : pair.last_status}</span>
+                            </div>
+                          </button>
 
-            <section className="panel dashboard-panel">
-              <div className="panel-header"><div><p className="eyebrow">Übersicht</p><h2>Deine Syncs</h2></div></div>
-              {dashboardLoading ? <p className="state">Lade Dashboard...</p> : null}
-              {!dashboardLoading && syncPairs.length === 0 ? <p className="state">Noch keine Sync-Paare vorhanden.</p> : null}
-              {!dashboardLoading ? (
-                <div className="sync-list">
-                  {syncPairs.map((pair) => {
-                    const isOpen = selectedSyncPairId === pair.id;
-                    return (
-                      <article className={`sync-row ${isOpen ? "open" : ""}`} key={pair.id}>
-                        <button className="sync-row-summary" type="button" onClick={() => toggleSyncPair(pair.id)}>
-                          <div className="sync-row-main">
-                            <strong>{pair.name}</strong>
-                            <span>{describeSchedule(pair)}</span>
-                          </div>
-                          <div className="sync-row-meta">
-                            <span>{pair.source_path}</span>
-                            <span>{pair.destination_path}</span>
-                            <span>{formatDateTime(pair.last_run_at)}</span>
-                            <span>{formatDateTime(pair.next_run_at)}</span>
-                            <span className={`badge ${pair.status === "running" ? "running" : pair.last_status === "error" ? "error" : "idle"}`}>{pair.status === "running" ? "running" : pair.last_status}</span>
-                          </div>
-                        </button>
+                          {isOpen ? (
+                            <div className="sync-row-detail">
+                              <div className="sync-row-toolbar">
+                                <div className="action-stack">
+                                  <button className="table-button" type="button" onClick={() => handleEditSyncPair(pair)}>Bearbeiten</button>
+                                  <button className="table-button" type="button" onClick={() => void handleToggleSyncPair(pair)}>{pair.enabled ? "Deaktivieren" : "Aktivieren"}</button>
+                                  <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id || !pair.enabled} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Läuft..." : "Jetzt starten"}</button>
+                                  <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Löschen</button>
+                                </div>
+                              </div>
 
-                        {isOpen ? (
-                          <div className="sync-row-detail">
-                            <div className="sync-row-toolbar">
-                              <div className="action-stack">
-                                <button className="table-button" type="button" onClick={() => handleEditSyncPair(pair)}>Bearbeiten</button>
-                                <button className="table-button" type="button" onClick={() => void handleToggleSyncPair(pair)}>{pair.enabled ? "Deaktivieren" : "Aktivieren"}</button>
-                                <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id || !pair.enabled} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Läuft..." : "Jetzt starten"}</button>
-                                <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Löschen</button>
+                              <div className="sync-expanded-grid">
+                                <section className="subpanel">
+                                  <div className="panel-header"><div><p className="eyebrow">Zeitplan</p><h3>{pair.name}</h3></div></div>
+                                  <form className="sync-form compact-form" onSubmit={handleUpdateSchedule}>
+                                    <label className="schedule-toggle"><span>Zeitplan aktiv</span><input type="checkbox" checked={scheduleEditState.schedule_enabled} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_enabled: event.target.checked }))} /></label>
+                                    <label><span>Intervall</span><select value={scheduleEditState.schedule_type} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="hourly">Stündlich</option><option value="interval">Alle X Minuten</option></select></label>
+                                    {scheduleEditState.schedule_type === "interval" ? (
+                                      <label><span>Minuten</span><input min={5} step={5} type="number" value={scheduleEditState.schedule_interval_minutes} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_interval_minutes: Number(event.target.value) }))} /></label>
+                                    ) : (
+                                      <label><span>Uhrzeit</span><input type="time" value={scheduleEditState.schedule_time} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_time: event.target.value }))} /></label>
+                                    )}
+                                    {scheduleEditState.schedule_type === "weekly" ? (
+                                      <label><span>Wochentag</span><select value={scheduleEditState.schedule_weekday} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_weekday: Number(event.target.value) }))}>{weekdayOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+                                    ) : null}
+                                    <label><span>Max. Löschungen</span><input min={0} type="number" value={scheduleEditState.max_delete_count} onChange={(event) => setScheduleEditState((current) => ({ ...current, max_delete_count: Number(event.target.value) }))} /></label>
+                                    <label><span>Backup-Verzeichnis</span><input placeholder="Optional" value={scheduleEditState.backup_dir} onChange={(event) => setScheduleEditState((current) => ({ ...current, backup_dir: event.target.value }))} /></label>
+                                    <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Zeitplan speichern"}</button>
+                                  </form>
+                                </section>
+
+                                <section className="subpanel subpanel-wide">
+                                  <div className="panel-header"><div><p className="eyebrow">Verlauf</p><h3>Übertragungen</h3></div></div>
+                                  {runLoading ? <p className="state">Lade letzte Läufe...</p> : null}
+                                  {!runLoading && runs.length === 0 ? <p className="state">Bisher wurden für dieses Sync-Paar noch keine Dateien übertragen.</p> : null}
+                                  {runs.length > 0 ? (
+                                    <div className="run-table">
+                                      {runs.map((run) => {
+                                        const progress = runProgressById[run.id];
+                                        const progressPoints = progress?.history ?? [];
+                                        const speedPolyline = buildSpeedPolyline(progressPoints);
+                                        const percent = progress?.percent_complete ?? (run.status === "success" ? 100 : null);
+                                        const speedValue = progress?.average_speed_bytes_per_second ?? run.average_speed_bytes_per_second;
+                                        const bytesValue = progress?.bytes_transferred ?? run.bytes_transferred;
+                                        const filesValue = progress?.files_transferred ?? run.files_transferred;
+                                        const finishEstimate = progress?.estimated_completion_at ?? null;
+
+                                        return (
+                                          <article className={`run-row ${selectedRunId === run.id ? "selected" : ""}`} key={run.id}>
+                                            <button className="run-row-summary" type="button" onClick={() => setSelectedRunId((current) => current === run.id ? null : run.id)}>
+                                              <span>{formatDateTime(run.started_at)}</span>
+                                              <span>{filesValue}</span>
+                                              <span>{formatBytes(bytesValue)}</span>
+                                              <span>{run.status === "running" ? "läuft..." : formatDuration(run.duration_seconds)}</span>
+                                              <span>{formatBytes(speedValue)}/s</span>
+                                              <span>{run.status === "running" && finishEstimate ? formatDateTime(finishEstimate) : formatDateTime(run.finished_at)}</span>
+                                              <span className={`badge ${run.status}`}>{run.status}</span>
+                                            </button>
+                                            {selectedRunId === run.id ? (
+                                              <div className="run-row-detail">
+                                                {run.status === "running" && progress ? (
+                                                  <section className="live-progress-card">
+                                                    <div className="live-progress-head">
+                                                      <div>
+                                                        <p className="eyebrow">Live-Fortschritt</p>
+                                                        <h3>Kopiervorgang läuft</h3>
+                                                      </div>
+                                                      <strong>{formatPercent(percent)}</strong>
+                                                    </div>
+                                                    <div className="progress-bar-shell" aria-hidden="true">
+                                                      <div className="progress-bar-fill" style={{ width: `${Math.max(4, percent ?? 6)}%` }} />
+                                                      <svg className="progress-speed-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                                        <polyline points={speedPolyline} />
+                                                      </svg>
+                                                    </div>
+                                                    <div className="live-progress-grid">
+                                                      <article className="report-highlight"><span>Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
+                                                      <article className="report-highlight"><span>Dateien bewegt</span><strong>{filesValue}{progress.total_files ? ` / ${progress.total_files}` : ""}</strong></article>
+                                                      <article className="report-highlight"><span>Transfer</span><strong>{formatBytes(bytesValue)}{progress.total_bytes ? ` / ${formatBytes(progress.total_bytes)}` : ""}</strong></article>
+                                                      <article className="report-highlight"><span>Voraussichtliches Ende</span><strong>{finishEstimate ? formatDateTime(finishEstimate) : "Wird berechnet"}</strong></article>
+                                                    </div>
+                                                  </section>
+                                                ) : null}
+                                                <div className="report-summary">
+                                                  <article className="report-highlight"><span>Dateien bewegt</span><strong>{filesValue}</strong></article>
+                                                  <article className="report-highlight"><span>Transfer-Volumen</span><strong>{formatBytes(bytesValue)}</strong></article>
+                                                  <article className="report-highlight"><span>Ø Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
+                                                  <article className="report-highlight"><span>Dauer</span><strong>{run.status === "running" ? "läuft..." : formatDuration(run.duration_seconds)}</strong></article>
+                                                </div>
+                                                <p className="report-copy">{run.report}</p>
+                                                <div className="report-detail-grid">
+                                                  <article className="report-block">
+                                                    <h3>Kennzahlen</h3>
+                                                    <p>Start: {formatDateTime(run.started_at)}</p>
+                                                    <p>Ende: {run.status === "running" && finishEstimate ? formatDateTime(finishEstimate) : formatDateTime(run.finished_at)}</p>
+                                                    <p>Trigger: {run.trigger_type}</p>
+                                                    <p>Gelöschte Dateien: {run.files_deleted}</p>
+                                                    <p>Fehler: {run.error_count}</p>
+                                                    <p>Exit-Code: {run.exit_code ?? "-"}</p>
+                                                  </article>
+                                                  <article className="report-block"><h3>Kommando</h3><code>{run.rclone_command}</code></article>
+                                                </div>
+                                                <article className="report-block">
+                                                  <h3>Vollständiges Log</h3>
+                                                  {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
+                                                </article>
+                                              </div>
+                                            ) : null}
+                                          </article>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : null}
+                                </section>
                               </div>
                             </div>
-
-                            <div className="sync-expanded-grid">
-                              <section className="subpanel">
-                                <div className="panel-header"><div><p className="eyebrow">Zeitplan</p><h3>{pair.name}</h3></div></div>
-                                <form className="sync-form compact-form" onSubmit={handleUpdateSchedule}>
-                                  <label className="schedule-toggle"><span>Zeitplan aktiv</span><input type="checkbox" checked={scheduleEditState.schedule_enabled} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_enabled: event.target.checked }))} /></label>
-                                  <label><span>Intervall</span><select value={scheduleEditState.schedule_type} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_type: event.target.value }))}><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option><option value="hourly">Stündlich</option><option value="interval">Alle X Minuten</option></select></label>
-                                  {scheduleEditState.schedule_type === "interval" ? (
-                                    <label><span>Minuten</span><input min={5} step={5} type="number" value={scheduleEditState.schedule_interval_minutes} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_interval_minutes: Number(event.target.value) }))} /></label>
-                                  ) : (
-                                    <label><span>Uhrzeit</span><input type="time" value={scheduleEditState.schedule_time} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_time: event.target.value }))} /></label>
-                                  )}
-                                  {scheduleEditState.schedule_type === "weekly" ? (
-                                    <label><span>Wochentag</span><select value={scheduleEditState.schedule_weekday} onChange={(event) => setScheduleEditState((current) => ({ ...current, schedule_weekday: Number(event.target.value) }))}>{weekdayOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-                                  ) : null}
-                                  <label><span>Max. Löschungen</span><input min={0} type="number" value={scheduleEditState.max_delete_count} onChange={(event) => setScheduleEditState((current) => ({ ...current, max_delete_count: Number(event.target.value) }))} /></label>
-                                  <label><span>Backup-Verzeichnis</span><input placeholder="Optional" value={scheduleEditState.backup_dir} onChange={(event) => setScheduleEditState((current) => ({ ...current, backup_dir: event.target.value }))} /></label>
-                                  <button className="primary-button" type="submit" disabled={submitting}>{submitting ? "Speichere..." : "Zeitplan speichern"}</button>
-                                </form>
-                              </section>
-
-                              <section className="subpanel subpanel-wide">
-                                <div className="panel-header"><div><p className="eyebrow">Verlauf</p><h3>Übertragungen</h3></div></div>
-                                {runLoading ? <p className="state">Lade letzte Läufe...</p> : null}
-                                {!runLoading && runs.length === 0 ? <p className="state">Bisher wurden für dieses Sync-Paar noch keine Dateien übertragen.</p> : null}
-                                {runs.length > 0 ? (
-                                  <div className="run-table">
-                                    {runs.map((run) => {
-                                      const progress = runProgressById[run.id];
-                                      const progressPoints = progress?.history ?? [];
-                                      const speedPolyline = buildSpeedPolyline(progressPoints);
-                                      const percent = progress?.percent_complete ?? (run.status === "success" ? 100 : null);
-                                      const speedValue = progress?.average_speed_bytes_per_second ?? run.average_speed_bytes_per_second;
-                                      const bytesValue = progress?.bytes_transferred ?? run.bytes_transferred;
-                                      const filesValue = progress?.files_transferred ?? run.files_transferred;
-                                      const finishEstimate = progress?.estimated_completion_at ?? null;
-
-                                      return (
-                                        <article className={`run-row ${selectedRunId === run.id ? "selected" : ""}`} key={run.id}>
-                                          <button className="run-row-summary" type="button" onClick={() => setSelectedRunId((current) => current === run.id ? null : run.id)}>
-                                            <span>{formatDateTime(run.started_at)}</span>
-                                            <span>{filesValue}</span>
-                                            <span>{formatBytes(bytesValue)}</span>
-                                            <span>{run.status === "running" ? "läuft..." : formatDuration(run.duration_seconds)}</span>
-                                            <span>{formatBytes(speedValue)}/s</span>
-                                            <span>{run.status === "running" && finishEstimate ? formatDateTime(finishEstimate) : formatDateTime(run.finished_at)}</span>
-                                            <span className={`badge ${run.status}`}>{run.status}</span>
-                                          </button>
-                                          {selectedRunId === run.id ? (
-                                            <div className="run-row-detail">
-                                              {run.status === "running" && progress ? (
-                                                <section className="live-progress-card">
-                                                  <div className="live-progress-head">
-                                                    <div>
-                                                      <p className="eyebrow">Live-Fortschritt</p>
-                                                      <h3>Kopiervorgang läuft</h3>
-                                                    </div>
-                                                    <strong>{formatPercent(percent)}</strong>
-                                                  </div>
-                                                  <div className="progress-bar-shell" aria-hidden="true">
-                                                    <div className="progress-bar-fill" style={{ width: `${Math.max(4, percent ?? 6)}%` }} />
-                                                    <svg className="progress-speed-chart" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                                      <polyline points={speedPolyline} />
-                                                    </svg>
-                                                  </div>
-                                                  <div className="live-progress-grid">
-                                                    <article className="report-highlight"><span>Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
-                                                    <article className="report-highlight"><span>Dateien bewegt</span><strong>{filesValue}{progress.total_files ? ` / ${progress.total_files}` : ""}</strong></article>
-                                                    <article className="report-highlight"><span>Transfer</span><strong>{formatBytes(bytesValue)}{progress.total_bytes ? ` / ${formatBytes(progress.total_bytes)}` : ""}</strong></article>
-                                                    <article className="report-highlight"><span>Voraussichtliches Ende</span><strong>{finishEstimate ? formatDateTime(finishEstimate) : "Wird berechnet"}</strong></article>
-                                                  </div>
-                                                </section>
-                                              ) : null}
-                                              <div className="report-summary">
-                                                <article className="report-highlight"><span>Dateien bewegt</span><strong>{filesValue}</strong></article>
-                                                <article className="report-highlight"><span>Transfer-Volumen</span><strong>{formatBytes(bytesValue)}</strong></article>
-                                                <article className="report-highlight"><span>Ø Geschwindigkeit</span><strong>{formatBytes(speedValue)}/s</strong></article>
-                                                <article className="report-highlight"><span>Dauer</span><strong>{run.status === "running" ? "läuft..." : formatDuration(run.duration_seconds)}</strong></article>
-                                              </div>
-                                              <p className="report-copy">{run.report}</p>
-                                              <div className="report-detail-grid">
-                                                <article className="report-block">
-                                                  <h3>Kennzahlen</h3>
-                                                  <p>Start: {formatDateTime(run.started_at)}</p>
-                                                  <p>Ende: {run.status === "running" && finishEstimate ? formatDateTime(finishEstimate) : formatDateTime(run.finished_at)}</p>
-                                                  <p>Trigger: {run.trigger_type}</p>
-                                                  <p>Gelöschte Dateien: {run.files_deleted}</p>
-                                                  <p>Fehler: {run.error_count}</p>
-                                                  <p>Exit-Code: {run.exit_code ?? "-"}</p>
-                                                </article>
-                                                <article className="report-block"><h3>Kommando</h3><code>{run.rclone_command}</code></article>
-                                              </div>
-                                              <article className="report-block">
-                                                <h3>Vollständiges Log</h3>
-                                                {runLogLoading ? <p className="state">Lade Log...</p> : <pre className="log-output">{selectedRunLog || "Kein Log verfügbar."}</pre>}
-                                              </article>
-                                            </div>
-                                          ) : null}
-                                        </article>
-                                      );
-                                    })}
-                                  </div>
-                                ) : null}
-                              </section>
-                            </div>
-                          </div>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </section>
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ));
+            })() : null}
           </>
         ) : activeSection === "users" && currentUser.role === "admin" ? (
           <>

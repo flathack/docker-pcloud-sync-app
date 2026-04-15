@@ -1303,6 +1303,66 @@ select {
   outline-color: rgba(111, 195, 242, 0.24);
 }
 
+/* ── Bar Chart ── */
+.bar-chart-shell {
+  padding: 1rem 0.5rem 0.25rem;
+  overflow-x: auto;
+}
+.bar-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.bar-chart-bar {
+  fill: var(--accent, #5b8def);
+  transition: opacity 0.15s;
+}
+.bar-chart-bar:hover { opacity: 0.75; }
+.bar-chart-label {
+  font-size: 10px;
+  fill: var(--text-muted, #6a7b8d);
+}
+.bar-chart-value {
+  font-size: 8px;
+  fill: var(--text-muted, #6a7b8d);
+}
+:root[data-theme="dark"] .bar-chart-bar { fill: #6fbcf2; }
+:root[data-theme="dark"] .bar-chart-label { fill: #88a0b8; }
+:root[data-theme="dark"] .bar-chart-value { fill: #88a0b8; }
+
+/* ── Quick-start inline actions ── */
+.inline-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.inline-actions select {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #d8dfe6);
+  border-radius: 6px;
+  font: inherit;
+  background: var(--card-bg, #fff);
+  color: inherit;
+}
+:root[data-theme="dark"] .inline-actions select {
+  background: #1b2836;
+  border-color: #2a3d52;
+  color: #cddaec;
+}
+
+/* ── Sync Group (Sync-Ziele) ── */
+.sync-group + .sync-group { margin-top: 1.5rem; }
+
+/* ── Dashboard running-sync enhanced ── */
+.running-sync-card .progress-bar-shell { margin: 0.5rem 0; }
+.running-sync-card .running-sync-percent {
+  font-size: 1.4rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 980px) {
   .sidebar {
     position: static;
