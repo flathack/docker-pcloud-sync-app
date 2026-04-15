@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from app.schemas.browser import BrowserEntry, BrowserResponse
+from app.services.settings import get_rclone_config_status
 
 
 def _configured_roots() -> list[Path]:
@@ -74,7 +75,7 @@ def _remote_parent(path_value: str) -> str | None:
     remote, _, tail = path_value.partition(":")
     tail = tail.strip("/")
     if not tail:
-        return None
+        return ""
     parts = tail.split("/")
     if len(parts) == 1:
         return f"{remote}:"
@@ -82,7 +83,15 @@ def _remote_parent(path_value: str) -> str | None:
 
 
 def _browse_remote(path_value: str) -> BrowserResponse:
-    target = path_value or os.getenv("DEFAULT_REMOTE_ROOT", "pcloud:")
+    if not path_value:
+        status = get_rclone_config_status()
+        entries = [
+            BrowserEntry(name=remote, path=f"{remote}:", entry_type="root")
+            for remote in status.remotes
+        ]
+        return BrowserResponse(current_path="", parent_path=None, backend_type="remote", entries=entries)
+
+    target = path_value
     command = ["rclone", "lsf", target, "--dirs-only", "--max-depth", "1"]
     result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=30)
     if result.returncode != 0:

@@ -245,6 +245,7 @@ export function App() {
   const [uploadingConfig, setUploadingConfig] = useState(false);
   const [selectedConfigFile, setSelectedConfigFile] = useState<File | null>(null);
   const [testResult, setTestResult] = useState<RcloneConfigTestResult | null>(null);
+  const [testRemote, setTestRemote] = useState<string>("");
   const [telegramStatus, setTelegramStatus] = useState<TelegramSettingsStatus | null>(null);
   const [telegramFormState, setTelegramFormState] = useState(initialTelegramFormState);
   const [telegramSaving, setTelegramSaving] = useState(false);
@@ -722,9 +723,10 @@ export function App() {
   async function handleRcloneTest() {
     try {
       setTestLoading(true);
+      const remoteName = testRemote || rcloneStatus?.remotes[0] ?? null;
       const response = await apiFetch("/settings/rclone/test", {
         method: "POST",
-        body: JSON.stringify({ remote_name: rcloneStatus?.remotes[0] ?? null }),
+        body: JSON.stringify({ remote_name: remoteName }),
       });
       if (!response.ok) throw new Error(`rclone-Test fehlgeschlagen mit Status ${response.status}`);
       setTestResult((await response.json()) as RcloneConfigTestResult);
@@ -1259,8 +1261,13 @@ export function App() {
             <section className="panel">
               <div className="panel-header"><div><p className="eyebrow">Verbindungstest</p><h2>Erkannten Remote prüfen</h2></div></div>
               <div className="inline-actions">
+                {rcloneStatus && rcloneStatus.remotes.length > 0 ? (
+                  <select value={testRemote || rcloneStatus.remotes[0]} onChange={(event) => setTestRemote(event.target.value)}>
+                    {rcloneStatus.remotes.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                ) : null}
                 <button className="primary-button" type="button" disabled={testLoading || !rcloneStatus?.remotes.length} onClick={() => void handleRcloneTest()}>{testLoading ? "Teste..." : "Remote testen"}</button>
-                <span className="settings-note">{rcloneStatus?.remotes.length ? `Testet standardmäßig ${rcloneStatus.remotes[0]}` : "Zuerst eine gültige rclone.conf hochladen"}</span>
+                <span className="settings-note">{rcloneStatus?.remotes.length ? "" : "Zuerst eine gültige rclone.conf hochladen"}</span>
               </div>
               {testResult ? <p className={`state ${testResult.ok ? "" : "error"}`}>{testResult.detail}</p> : null}
             </section>
@@ -1316,12 +1323,12 @@ export function App() {
               <div className="browser-topbar">
                 <div className="browser-location">
                   <span className="browser-chip">{browserMode === "remote" ? "Remote" : "Lokal"}</span>
-                  <strong>{browserData?.current_path || (browserMode === "remote" ? "pcloud:" : "Wurzeln")}</strong>
+                  <strong>{browserData?.current_path || (browserMode === "remote" ? "Remotes" : "Wurzeln")}</strong>
                 </div>
                 <div className="inline-actions">
                   <button className="table-button" type="button" disabled={browserMode === "local"} onClick={() => void loadBrowser(null, "local")}>Lokal</button>
                   <button className="table-button primary-inline" type="button" disabled={browserMode === "remote"} onClick={() => void loadBrowser(null, "remote")}>Remote</button>
-                  <button className="table-button" type="button" disabled={!browserData?.parent_path} onClick={() => void loadBrowser(browserData?.parent_path ?? null, browserMode)}>Eine Ebene hoch</button>
+                  <button className="table-button" type="button" disabled={browserData?.parent_path == null} onClick={() => void loadBrowser(browserData?.parent_path ?? null, browserMode)}>Eine Ebene hoch</button>
                 </div>
               </div>
 

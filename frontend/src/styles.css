@@ -1240,6 +1240,69 @@ select {
   color: #88a0b8;
 }
 
+:root[data-theme="dark"] .running-sync-banner {
+  background: linear-gradient(180deg, #16202b, #1b2835);
+  border-color: #2a3948;
+}
+
+:root[data-theme="dark"] .running-sync-card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #2a3948;
+}
+
+:root[data-theme="dark"] .running-sync-head strong {
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .running-sync-head p {
+  color: #9fb0c3;
+}
+
+:root[data-theme="dark"] .running-sync-metrics article {
+  background: #16202b;
+  border-color: #2a3948;
+}
+
+:root[data-theme="dark"] .running-sync-metrics span {
+  color: #88a0b8;
+}
+
+:root[data-theme="dark"] .running-sync-metrics strong {
+  color: #e6edf5;
+}
+
+:root[data-theme="dark"] .toggle-button {
+  background: #16202b;
+  border-color: #334455;
+  color: #dce6f2;
+}
+
+:root[data-theme="dark"] .toggle-button.is-enabled {
+  background: rgba(29, 138, 97, 0.16);
+  border-color: #1d8a61;
+  color: #6fcfa0;
+}
+
+:root[data-theme="dark"] .toggle-button.is-enabled .toggle-thumb {
+  background: #34d399;
+}
+
+:root[data-theme="dark"] .badge.success {
+  background: rgba(29, 138, 97, 0.16);
+  color: #6fcfa0;
+}
+
+:root[data-theme="dark"] .badge.muted {
+  background: rgba(255, 255, 255, 0.06);
+  color: #88a0b8;
+}
+
+:root[data-theme="dark"] .sync-row.open,
+:root[data-theme="dark"] .run-row.selected,
+:root[data-theme="dark"] .run-card.selected {
+  outline-color: rgba(111, 195, 242, 0.24);
+}
+
 @media (max-width: 980px) {
   .sidebar {
     position: static;
