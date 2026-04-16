@@ -175,9 +175,11 @@ def _cleanup_stale_running_state() -> None:
             run.status = "error"
             run.short_log = "Sync-Lauf wurde durch Neustart des Servers abgebrochen."
             run.report = "Der Lauf war beim Serverstart noch als 'running' markiert und wurde als fehlgeschlagen eingestuft."
-            run.finished_at = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc)
+            run.finished_at = now
             if run.started_at:
-                run.duration_seconds = max(1, int((run.finished_at - run.started_at).total_seconds()))
+                started = run.started_at if run.started_at.tzinfo else run.started_at.replace(tzinfo=timezone.utc)
+                run.duration_seconds = max(1, int((now - started).total_seconds()))
             db.add(run)
 
         stale_pairs = list(db.scalars(select(SyncPair).where(SyncPair.status == "running")))
