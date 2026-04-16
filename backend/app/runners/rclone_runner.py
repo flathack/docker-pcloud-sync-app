@@ -124,7 +124,22 @@ def _build_rclone_command(sync_pair: SyncPair) -> list[str]:
 
 
 def _build_dry_run_command(command: list[str]) -> list[str]:
-    return [*command, "--dry-run", "--stats", "0"]
+    # Strip --max-delete (and its value) so rclone dry-run doesn't treat
+    # planned deletions as errors.  The preflight has its own deletion
+    # threshold check, and the real sync still carries --max-delete.
+    filtered: list[str] = []
+    skip_next = False
+    for token in command:
+        if skip_next:
+            skip_next = False
+            continue
+        if token == "--max-delete":
+            skip_next = True
+            continue
+        if token.startswith("--max-delete="):
+            continue
+        filtered.append(token)
+    return [*filtered, "--dry-run", "--stats", "0"]
 
 
 def _fallback_command(sync_pair: SyncPair) -> list[str]:
