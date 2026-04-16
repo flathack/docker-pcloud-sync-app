@@ -1359,81 +1359,101 @@ export function App() {
             <section className="hero">
               <div>
                 <p className="eyebrow">Settings</p>
-                <h1>rclone und Systemkonfiguration</h1>
-                <p className="hero-copy">Hier richtest du die `rclone.conf` für pCloud ein, prüfst die Verbindung und verwaltest die technischen Grundlagen des Systems.</p>
+                <h1>Systemkonfiguration</h1>
+                <p className="hero-copy">rclone-Verbindung und Telegram-Benachrichtigungen verwalten.</p>
               </div>
             </section>
 
+            {/* ── rclone ── */}
             <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">rclone</p><h2>Konfigurationsstatus</h2></div><button className="table-button" type="button" onClick={() => void loadRcloneStatus()}>Aktualisieren</button></div>
+              <div className="panel-header"><div><h2>rclone-Konfiguration</h2></div><button className="table-button" type="button" onClick={() => void loadRcloneStatus()}>Aktualisieren</button></div>
               {settingsLoading ? <p className="state">Lade rclone-Status...</p> : null}
               {error ? <p className="state error">Fehler: {error}</p> : null}
+
               {rcloneStatus ? (
-                <>
-                  <div className="settings-grid">
-                    <article className="settings-card"><span className={`badge ${rcloneStatus.exists ? "idle" : "error"}`}>{rcloneStatus.exists ? "vorhanden" : "fehlt"}</span><h3>Konfigurationsdatei</h3><p>{rcloneStatus.config_path}</p></article>
-                    <article className="settings-card"><span className={`badge ${rcloneStatus.is_valid ? "idle" : "error"}`}>{rcloneStatus.is_valid ? "gültig" : "ungültig"}</span><h3>Erkannte Remotes</h3><p>{rcloneStatus.remotes.length > 0 ? rcloneStatus.remotes.join(", ") : "Keine"}</p></article>
-                    <article className="settings-card"><span className="badge idle">Info</span><h3>Datei</h3><p>{rcloneStatus.file_size ? `${rcloneStatus.file_size} Bytes` : "Keine Dateigröße"}</p><p>{rcloneStatus.updated_at ? new Date(rcloneStatus.updated_at).toLocaleString("de-DE") : "Noch nie aktualisiert"}</p></article>
+                <div className="settings-status-row">
+                  <div className="settings-status-item">
+                    <span className={`badge ${rcloneStatus.exists ? "idle" : "error"}`}>{rcloneStatus.exists ? "vorhanden" : "fehlt"}</span>
+                    <div><strong>Konfigurationsdatei</strong><p>{rcloneStatus.config_path}</p></div>
                   </div>
-                  <p className="state">{rcloneStatus.detail}</p>
-                </>
+                  <div className="settings-status-item">
+                    <span className={`badge ${rcloneStatus.is_valid ? "idle" : "error"}`}>{rcloneStatus.is_valid ? "gültig" : "ungültig"}</span>
+                    <div><strong>Remotes</strong><p>{rcloneStatus.remotes.length > 0 ? rcloneStatus.remotes.join(", ") : "Keine"}</p></div>
+                  </div>
+                  <div className="settings-status-item">
+                    <span className="badge idle">Info</span>
+                    <div><strong>Dateigröße</strong><p>{rcloneStatus.file_size ? `${rcloneStatus.file_size} Bytes` : "–"} · {rcloneStatus.updated_at ? new Date(rcloneStatus.updated_at).toLocaleString("de-DE") : "Noch nie aktualisiert"}</p></div>
+                  </div>
+                </div>
               ) : null}
-            </section>
 
-            <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Upload</p><h2>rclone.conf hochladen</h2></div></div>
-              <form className="settings-form" onSubmit={handleRcloneUpload}>
-                <label><span>Konfigurationsdatei</span><input type="file" accept=".conf" onChange={handleConfigFileChange} /></label>
-                <button className="primary-button" type="submit" disabled={uploadingConfig}>{uploadingConfig ? "Lade hoch..." : "rclone.conf hochladen"}</button>
-              </form>
-            </section>
-
-            <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Verbindungstest</p><h2>Erkannten Remote prüfen</h2></div></div>
-              <div className="inline-actions">
-                {rcloneStatus && rcloneStatus.remotes.length > 0 ? (
-                  <select value={testRemote || rcloneStatus.remotes[0]} onChange={(event) => setTestRemote(event.target.value)}>
-                    {rcloneStatus.remotes.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                ) : null}
-                <button className="primary-button" type="button" disabled={testLoading || !rcloneStatus?.remotes.length} onClick={() => void handleRcloneTest()}>{testLoading ? "Teste..." : "Remote testen"}</button>
-                <span className="settings-note">{rcloneStatus?.remotes.length ? "" : "Zuerst eine gültige rclone.conf hochladen"}</span>
+              <div className="settings-actions-row">
+                <div className="settings-action-group">
+                  <h3>Konfiguration hochladen</h3>
+                  <form className="settings-inline-form" onSubmit={handleRcloneUpload}>
+                    <input type="file" accept=".conf" onChange={handleConfigFileChange} />
+                    <button className="primary-button" type="submit" disabled={uploadingConfig}>{uploadingConfig ? "Lade hoch..." : "Hochladen"}</button>
+                  </form>
+                </div>
+                <div className="settings-action-group">
+                  <h3>Remote testen</h3>
+                  <div className="settings-inline-form">
+                    {rcloneStatus && rcloneStatus.remotes.length > 0 ? (
+                      <select value={testRemote || rcloneStatus.remotes[0]} onChange={(event) => setTestRemote(event.target.value)}>
+                        {rcloneStatus.remotes.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    ) : <span className="settings-note">Zuerst rclone.conf hochladen</span>}
+                    <button className="primary-button" type="button" disabled={testLoading || !rcloneStatus?.remotes.length} onClick={() => void handleRcloneTest()}>{testLoading ? "Teste..." : "Testen"}</button>
+                  </div>
+                  {testResult ? <p className={`state ${testResult.ok ? "" : "error"}`}>{testResult.detail}</p> : null}
+                </div>
               </div>
-              {testResult ? <p className={`state ${testResult.ok ? "" : "error"}`}>{testResult.detail}</p> : null}
             </section>
 
+            {/* ── Telegram ── */}
             <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Telegram</p><h2>Benachrichtigungen</h2></div><button className="table-button" type="button" onClick={() => void loadTelegramStatus()}>Aktualisieren</button></div>
+              <div className="panel-header"><div><h2>Telegram-Benachrichtigungen</h2></div><button className="table-button" type="button" onClick={() => void loadTelegramStatus()}>Aktualisieren</button></div>
+
               {telegramStatus ? (
-                <>
-                  <div className="settings-grid">
-                    <article className="settings-card"><span className={`badge ${telegramStatus.enabled ? "idle" : "running"}`}>{telegramStatus.enabled ? "aktiv" : "inaktiv"}</span><h3>Modulstatus</h3><p>{telegramStatus.detail}</p></article>
-                    <article className="settings-card"><span className={`badge ${telegramStatus.bot_token_configured ? "idle" : "error"}`}>{telegramStatus.bot_token_configured ? "konfiguriert" : "fehlt"}</span><h3>Bot und Chat</h3><p>{telegramStatus.chat_id ? `Chat-ID: ${telegramStatus.chat_id}` : "Noch keine Chat-ID gespeichert"}</p></article>
-                    <article className="settings-card"><span className="badge idle">Trigger</span><h3>Versandregeln</h3><p>Erfolg: {telegramStatus.notify_on_success ? "ja" : "nein"}</p><p>Fehler: {telegramStatus.notify_on_error ? "ja" : "nein"}</p></article>
+                <div className="settings-status-row">
+                  <div className="settings-status-item">
+                    <span className={`badge ${telegramStatus.enabled ? "idle" : "running"}`}>{telegramStatus.enabled ? "aktiv" : "inaktiv"}</span>
+                    <div><strong>Status</strong><p>{telegramStatus.detail}</p></div>
                   </div>
-                </>
+                  <div className="settings-status-item">
+                    <span className={`badge ${telegramStatus.bot_token_configured ? "idle" : "error"}`}>{telegramStatus.bot_token_configured ? "konfiguriert" : "fehlt"}</span>
+                    <div><strong>Bot &amp; Chat</strong><p>{telegramStatus.chat_id ? `Chat-ID: ${telegramStatus.chat_id}` : "Keine Chat-ID"}</p></div>
+                  </div>
+                  <div className="settings-status-item">
+                    <span className="badge idle">Trigger</span>
+                    <div><strong>Versandregeln</strong><p>Erfolg: {telegramStatus.notify_on_success ? "ja" : "nein"} · Fehler: {telegramStatus.notify_on_error ? "ja" : "nein"}</p></div>
+                  </div>
+                </div>
               ) : null}
-            </section>
 
-            <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Telegram Setup</p><h2>Bot verbinden</h2></div></div>
-              <form className="settings-form" onSubmit={handleTelegramSave}>
-                <label className="schedule-toggle"><span>Telegram aktivieren</span><input type="checkbox" checked={telegramFormState.enabled} onChange={(event) => setTelegramFormState((current) => ({ ...current, enabled: event.target.checked }))} /></label>
-                <label><span>Bot Token</span><input type="password" placeholder={telegramStatus?.bot_token_configured ? "Bereits gespeichert, nur für Änderung neu eingeben" : "123456:ABC..."} value={telegramFormState.bot_token} onChange={(event) => setTelegramFormState((current) => ({ ...current, bot_token: event.target.value }))} /></label>
-                <label><span>Chat-ID</span><input value={telegramFormState.chat_id} onChange={(event) => setTelegramFormState((current) => ({ ...current, chat_id: event.target.value }))} /></label>
-                <label className="schedule-toggle"><span>Bei Erfolg senden</span><input type="checkbox" checked={telegramFormState.notify_on_success} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_success: event.target.checked }))} /></label>
-                <label className="schedule-toggle"><span>Bei Fehler senden</span><input type="checkbox" checked={telegramFormState.notify_on_error} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_error: event.target.checked }))} /></label>
-                <button className="primary-button" type="submit" disabled={telegramSaving}>{telegramSaving ? "Speichere..." : "Telegram speichern"}</button>
-              </form>
-            </section>
-
-            <section className="panel">
-              <div className="panel-header"><div><p className="eyebrow">Telegram Test</p><h2>Testnachricht senden</h2></div></div>
-              <div className="inline-actions">
-                <button className="primary-button" type="button" disabled={telegramTesting || !telegramStatus?.bot_token_configured} onClick={() => void handleTelegramTest()}>{telegramTesting ? "Sende..." : "Testnachricht senden"}</button>
-                <span className="settings-note">{telegramStatus?.bot_token_configured ? "Sendet eine kurze Testnachricht an den konfigurierten Chat." : "Zuerst Token und Chat-ID speichern"}</span>
+              <div className="settings-actions-row">
+                <div className="settings-action-group">
+                  <h3>Bot konfigurieren</h3>
+                  <form className="settings-compact-form" onSubmit={handleTelegramSave}>
+                    <div className="settings-form-grid">
+                      <label className="schedule-toggle"><span>Telegram aktivieren</span><input type="checkbox" checked={telegramFormState.enabled} onChange={(event) => setTelegramFormState((current) => ({ ...current, enabled: event.target.checked }))} /></label>
+                      <label><span>Bot Token</span><input type="password" placeholder={telegramStatus?.bot_token_configured ? "Gespeichert – nur bei Änderung eingeben" : "123456:ABC..."} value={telegramFormState.bot_token} onChange={(event) => setTelegramFormState((current) => ({ ...current, bot_token: event.target.value }))} /></label>
+                      <label><span>Chat-ID</span><input value={telegramFormState.chat_id} onChange={(event) => setTelegramFormState((current) => ({ ...current, chat_id: event.target.value }))} /></label>
+                      <label className="schedule-toggle"><span>Bei Erfolg senden</span><input type="checkbox" checked={telegramFormState.notify_on_success} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_success: event.target.checked }))} /></label>
+                      <label className="schedule-toggle"><span>Bei Fehler senden</span><input type="checkbox" checked={telegramFormState.notify_on_error} onChange={(event) => setTelegramFormState((current) => ({ ...current, notify_on_error: event.target.checked }))} /></label>
+                    </div>
+                    <button className="primary-button" type="submit" disabled={telegramSaving}>{telegramSaving ? "Speichere..." : "Speichern"}</button>
+                  </form>
+                </div>
+                <div className="settings-action-group">
+                  <h3>Testnachricht</h3>
+                  <div className="settings-inline-form">
+                    <button className="primary-button" type="button" disabled={telegramTesting || !telegramStatus?.bot_token_configured} onClick={() => void handleTelegramTest()}>{telegramTesting ? "Sende..." : "Testnachricht senden"}</button>
+                    <span className="settings-note">{telegramStatus?.bot_token_configured ? "Sendet eine Testnachricht an den Chat." : "Zuerst Token und Chat-ID speichern"}</span>
+                  </div>
+                  {telegramTestResult ? <p className={`state ${telegramTestResult.ok ? "" : "error"}`}>{telegramTestResult.detail}</p> : null}
+                </div>
               </div>
-              {telegramTestResult ? <p className={`state ${telegramTestResult.ok ? "" : "error"}`}>{telegramTestResult.detail}</p> : null}
             </section>
           </>
         )}

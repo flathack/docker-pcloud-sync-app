@@ -939,6 +939,125 @@ select {
 
 .settings-note {
   color: #5e6c84;
+  font-size: 0.88rem;
+}
+
+/* ── Settings consolidated layout ── */
+
+.settings-status-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.settings-status-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.settings-status-item strong {
+  display: block;
+  font-size: 0.88rem;
+  margin-bottom: 2px;
+}
+
+.settings-status-item p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #5e6c84;
+  word-break: break-all;
+}
+
+.settings-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.settings-action-group h3 {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #29455d;
+}
+
+.settings-inline-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.settings-inline-form input[type="file"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-inline-form select {
+  padding: 8px 12px;
+  border: 1px solid #c9d5e3;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #172b4d;
+}
+
+.settings-compact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.settings-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #29455d;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.settings-form-grid input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #c9d5e3;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #172b4d;
+}
+
+:root[data-theme="dark"] .settings-status-row {
+  border-bottom-color: #1e2d3d;
+}
+
+:root[data-theme="dark"] .settings-status-item p {
+  color: #8899aa;
+}
+
+:root[data-theme="dark"] .settings-action-group h3 {
+  color: #cdd9e5;
+}
+
+:root[data-theme="dark"] .settings-inline-form select,
+:root[data-theme="dark"] .settings-form-grid input {
+  background: #0d1b2a;
+  color: #e6edf3;
+  border-color: #2a3a4a;
+}
+
+:root[data-theme="dark"] .settings-form-grid label {
+  color: #cdd9e5;
 }
 
 .browser-overlay {
@@ -1578,6 +1697,16 @@ select {
 
   .user-actions {
     justify-content: flex-start;
+  }
+
+  .settings-actions-row,
+  .settings-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-inline-form {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
