@@ -298,6 +298,8 @@ def get_run_progress(
 
     progress = sync_run_service.get_run_progress(run_id)
     if progress is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Für diesen Run sind keine Live-Daten verfügbar")
+    return progress
 
 
 @router.post("/runs/{run_id}/cancel", response_model=SyncRunSummary)
@@ -315,8 +317,6 @@ def cancel_run(
         return sync_run_service.cancel_run(db, run)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Für diesen Run sind keine Live-Daten verfügbar")
-    return progress
 
 
 @router.get("/settings/rclone/status", response_model=RcloneConfigStatus)
