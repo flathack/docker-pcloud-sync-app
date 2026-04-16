@@ -1292,54 +1292,65 @@ export function App() {
               <div>
                 <p className="eyebrow">Users</p>
                 <h1>Benutzerverwaltung</h1>
-                <p className="hero-copy">Hier verwaltest du lokale Benutzerkonten für Anmeldung und Administration.</p>
+                <p className="hero-copy">Lokale Benutzerkonten verwalten, anlegen und Passwörter zurücksetzen.</p>
               </div>
             </section>
 
             {error ? <p className="state error">Fehler: {error}</p> : null}
 
-            <section className="dashboard-split">
+            <section className="panel">
+              <div className="panel-header"><div><p className="eyebrow">Übersicht</p><h2>Benutzerkonten</h2></div><button className="table-button" type="button" onClick={() => void loadUsers()}>Aktualisieren</button></div>
+              {userLoading ? <p className="state">Lade Benutzer...</p> : (
+                <div className="user-table-wrap">
+                  <table className="user-table">
+                    <thead>
+                      <tr><th>Benutzer</th><th>Rolle</th><th>Status</th><th>Erstellt</th><th className="user-actions-col">Aktionen</th></tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.username} className={!user.is_active ? "user-row-inactive" : ""}>
+                          <td><strong>{user.username}</strong>{user.username === currentUser.username ? <span className="badge-inline">du</span> : null}</td>
+                          <td>{user.role}</td>
+                          <td><span className={`badge ${user.is_active ? "idle" : "error"}`}>{user.is_active ? "Aktiv" : "Deaktiviert"}</span></td>
+                          <td>{formatDateTime(user.created_at)}</td>
+                          <td className="user-actions-col">
+                            <div className="user-actions">
+                              <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => { setPasswordResetState({ username: user.username, password: "" }); }}title="Passwort zurücksetzen">Passwort</button>
+                              <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleToggleUserActive(user)}>{user.is_active ? "Deaktivieren" : "Aktivieren"}</button>
+                              <button className="table-button danger-inline" type="button" disabled={user.username === currentUser.username} onClick={() => void handleDeleteUser(user.username)}>Löschen</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="user-forms-grid">
               <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Anlegen</p><h2>Neuen Benutzer erstellen</h2></div></div>
+                <div className="panel-header"><div><h2>Neuer Benutzer</h2></div></div>
                 <form className="sync-form compact-form" onSubmit={handleCreateUser}>
-                  <label><span>Benutzername</span><input required value={userFormState.username} onChange={(event) => setUserFormState((current) => ({ ...current, username: event.target.value }))} /></label>
-                  <label><span>Passwort</span><input required minLength={8} type="password" value={userFormState.password} onChange={(event) => setUserFormState((current) => ({ ...current, password: event.target.value }))} /></label>
-                  <label><span>Rolle</span><select value={userFormState.role} onChange={(event) => setUserFormState((current) => ({ ...current, role: event.target.value }))}><option value="admin">admin</option></select></label>
-                  <label className="schedule-toggle"><span>Aktiv</span><input type="checkbox" checked={userFormState.is_active} onChange={(event) => setUserFormState((current) => ({ ...current, is_active: event.target.checked }))} /></label>
+                  <div className="user-form-row">
+                    <label><span>Benutzername</span><input required value={userFormState.username} onChange={(event) => setUserFormState((current) => ({ ...current, username: event.target.value }))} /></label>
+                    <label><span>Passwort</span><input required minLength={8} type="password" value={userFormState.password} onChange={(event) => setUserFormState((current) => ({ ...current, password: event.target.value }))} /></label>
+                    <label><span>Rolle</span><select value={userFormState.role} onChange={(event) => setUserFormState((current) => ({ ...current, role: event.target.value }))}><option value="admin">admin</option></select></label>
+                    <label className="schedule-toggle"><span>Aktiv</span><input type="checkbox" checked={userFormState.is_active} onChange={(event) => setUserFormState((current) => ({ ...current, is_active: event.target.checked }))} /></label>
+                  </div>
                   <button className="primary-button" type="submit" disabled={userSubmitting}>{userSubmitting ? "Speichere..." : "Benutzer anlegen"}</button>
                 </form>
               </section>
 
               <section className="panel">
-                <div className="panel-header"><div><p className="eyebrow">Passwort</p><h2>Passwort zurücksetzen</h2></div></div>
+                <div className="panel-header"><div><h2>Passwort zurücksetzen</h2></div></div>
                 <form className="sync-form compact-form" onSubmit={handleResetPassword}>
-                  <label><span>Benutzer</span><select required value={passwordResetState.username} onChange={(event) => setPasswordResetState((current) => ({ ...current, username: event.target.value }))}><option value="">Bitte wählen</option>{users.map((user) => <option key={user.username} value={user.username}>{user.username}</option>)}</select></label>
-                  <label><span>Neues Passwort</span><input required minLength={8} type="password" value={passwordResetState.password} onChange={(event) => setPasswordResetState((current) => ({ ...current, password: event.target.value }))} /></label>
+                  <div className="user-form-row">
+                    <label><span>Benutzer</span><select required value={passwordResetState.username} onChange={(event) => setPasswordResetState((current) => ({ ...current, username: event.target.value }))}><option value="">Bitte wählen</option>{users.map((user) => <option key={user.username} value={user.username}>{user.username}</option>)}</select></label>
+                    <label><span>Neues Passwort</span><input required minLength={8} type="password" value={passwordResetState.password} onChange={(event) => setPasswordResetState((current) => ({ ...current, password: event.target.value }))} /></label>
+                  </div>
                   <button className="primary-button" type="submit" disabled={userSubmitting}>{userSubmitting ? "Speichere..." : "Passwort setzen"}</button>
                 </form>
-              </section>
-
-              <section className="panel report-panel">
-                <div className="panel-header"><div><p className="eyebrow">Benutzer</p><h2>Vorhandene Accounts</h2></div><button className="table-button" type="button" onClick={() => void loadUsers()}>Aktualisieren</button></div>
-                {userLoading ? <p className="state">Lade Benutzer...</p> : null}
-                {!userLoading ? (
-                  <div className="run-list">
-                    {users.map((user) => (
-                      <article className="run-card" key={user.username}>
-                        <div className="run-card-header">
-                          <strong>{user.username}</strong>
-                          <span className={`badge ${user.is_active ? "idle" : "error"}`}>{user.is_active ? "aktiv" : "deaktiviert"}</span>
-                        </div>
-                        <p>Rolle: {user.role}</p>
-                        <p>Angelegt: {formatDateTime(user.created_at)}</p>
-                        <div className="action-stack">
-                          <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleToggleUserActive(user)}>{user.is_active ? "Deaktivieren" : "Aktivieren"}</button>
-                          <button className="table-button" type="button" disabled={user.username === currentUser.username} onClick={() => void handleDeleteUser(user.username)}>Löschen</button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : null}
               </section>
             </section>
           </>
