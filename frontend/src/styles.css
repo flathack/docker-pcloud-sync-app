@@ -382,6 +382,13 @@ select {
   word-break: break-word;
 }
 
+.running-sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .running-sync-metrics {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
@@ -561,6 +568,12 @@ select {
   color: #177fb6;
 }
 
+.danger-inline {
+  background: #ffffff;
+  border-color: #d14343;
+  color: #d14343;
+}
+
 .logout-button {
   padding-block: 12px;
   width: 100%;
@@ -582,6 +595,10 @@ select {
 
 .primary-inline:hover {
   background: #f2f9fd;
+}
+
+.danger-inline:hover {
+  background: #fff5f5;
 }
 
 .toggle-button {
@@ -641,6 +658,11 @@ select {
 .badge.success {
   background: #e8f6ee;
   color: #176547;
+}
+
+.badge.cancelled {
+  background: #f5f0ff;
+  color: #6b47b8;
 }
 
 .badge.muted {
@@ -1177,8 +1199,18 @@ select {
   color: #63bdf1;
 }
 
+:root[data-theme="dark"] .danger-inline {
+  background: #16202b;
+  border-color: #d14343;
+  color: #ff8e8e;
+}
+
 :root[data-theme="dark"] .primary-inline:hover {
   background: rgba(29, 143, 204, 0.14);
+}
+
+:root[data-theme="dark"] .danger-inline:hover {
+  background: rgba(209, 67, 67, 0.14);
 }
 
 :root[data-theme="dark"] .badge.idle {
@@ -1195,6 +1227,11 @@ select {
 :root[data-theme="dark"] .state.error {
   background: rgba(209, 67, 67, 0.16);
   color: #ff8e8e;
+}
+
+:root[data-theme="dark"] .badge.cancelled {
+  background: rgba(107, 71, 184, 0.18);
+  color: #c4a8ff;
 }
 
 :root[data-theme="dark"] .browser-column-header {

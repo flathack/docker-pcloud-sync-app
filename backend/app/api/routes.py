@@ -298,6 +298,23 @@ def get_run_progress(
 
     progress = sync_run_service.get_run_progress(run_id)
     if progress is None:
+
+
+@router.post("/runs/{run_id}/cancel", response_model=SyncRunSummary)
+def cancel_run(
+    run_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserSummary = Depends(require_current_user),
+) -> SyncRunSummary:
+    run = sync_run_service.get_run(db, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
+    if run.status != "running":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nur laufende Runs können abgebrochen werden")
+    try:
+        return sync_run_service.cancel_run(db, run)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Für diesen Run sind keine Live-Daten verfügbar")
     return progress
 

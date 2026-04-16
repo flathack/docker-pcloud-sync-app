@@ -20,6 +20,7 @@ def utc_now() -> datetime:
 
 _progress_lock = threading.Lock()
 _run_progress: dict[str, SyncRunProgressStatus] = {}
+_cancel_events: dict[str, threading.Event] = {}
 
 
 def list_runs(db: Session, limit: int = 50) -> list[SyncRun]:
@@ -65,6 +66,15 @@ def read_run_log(run: SyncRun) -> str:
         return ""
 
     return log_path.read_text(encoding="utf-8")
+
+
+def cancel_run(db: Session, run: SyncRun) -> SyncRun:
+    with _progress_lock:
+        cancel_event = _cancel_events.get(run.id)
+    if cancel_event is None:
+        raise ValueError("Dieser Lauf kann nicht abgebrochen werden.")
+    cancel_event.set()
+    return run
 
 
 def _apply_run_result(db: Session, sync_pair: SyncPair, run: SyncRun) -> None:
@@ -144,6 +154,9 @@ def _mark_progress_finished(run_id: str, status: str, finished_at: datetime) -> 
 
 
 def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
+    cancel_event = threading.Event()
+    with _progress_lock:
+        _cancel_events[run_id] = cancel_event
     db = SessionLocal()
     try:
         sync_pair = db.get(SyncPair, sync_pair_id)
@@ -159,7 +172,7 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
                 progress=progress,
             )
 
-        result = run_sync_pair(sync_pair, progress_callback=handle_progress)
+        result = run_sync_pair(sync_pair, progress_callback=handle_progress, cancel_event=cancel_event)
 
         run.status = result.status
         run.started_at = result.started_at
@@ -176,7 +189,7 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
         run.full_log_path = result.full_log_path
         run.rclone_command = result.command
 
-        sync_pair.status = "idle" if result.status == "success" else "error"
+        sync_pair.status = "idle" if result.status in ("success", "cancelled") else "error"
         sync_pair.last_status = result.status
         sync_pair.last_run_at = result.finished_at
         sync_pair.next_run_at = calculate_next_run(
@@ -192,7 +205,7 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
         db.add(sync_pair)
         db.commit()
         _mark_progress_finished(run_id, result.status, result.finished_at)
-        should_keep_run = run.status == "error" or _should_keep_run(run)
+        should_keep_run = run.status in ("error", "cancelled") or _should_keep_run(run)
         if should_keep_run:
             db.refresh(run)
             _apply_run_result(db, sync_pair, run)
@@ -219,6 +232,8 @@ def _execute_sync_run_in_background(sync_pair_id: str, run_id: str) -> None:
         db.commit()
         _mark_progress_finished(run_id, "error", finished_at)
     finally:
+        with _progress_lock:
+            _cancel_events.pop(run_id, None)
         db.close()
 
 
@@ -350,7 +365,7 @@ def _should_keep_run(run: SyncRun) -> bool:
 
 def _listable_run_filter():
     return or_(
-        SyncRun.status.in_(("running", "error")),
+        SyncRun.status.in_(("running", "error", "cancelled")),
         SyncRun.files_transferred > 0,
         SyncRun.bytes_transferred > 0,
     )

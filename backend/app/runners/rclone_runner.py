@@ -5,6 +5,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -511,6 +512,7 @@ def run_sync_pair(
     sync_pair: SyncPair,
     *,
     progress_callback: Callable[[RunnerProgress], None] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> RunnerResult:
     started_at = utc_now()
     command = _build_rclone_command(sync_pair)
@@ -545,7 +547,16 @@ def run_sync_pair(
             bufsize=1,
         )
         assert process.stdout is not None
+        cancelled = False
         for raw_line in process.stdout:
+            if cancel_event is not None and cancel_event.is_set():
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                cancelled = True
+                break
             stdout_lines.append(raw_line)
             message = _extract_message_from_line(raw_line)
             _update_stats_from_message(stats, message)
@@ -555,7 +566,11 @@ def run_sync_pair(
                     stats.files_transferred = per_file_events
             if progress_callback is not None and executable is not None:
                 progress_callback(_progress_from_stats(stats, timestamp=utc_now()))
-        return_code = process.wait(timeout=300)
+        if cancelled:
+            return_code = -2
+            stderr_text = "Sync-Lauf wurde vom Benutzer abgebrochen."
+        else:
+            return_code = process.wait(timeout=300)
     except subprocess.TimeoutExpired:
         process.kill()
         return_code = 124
@@ -602,10 +617,12 @@ def run_sync_pair(
             )
         )
 
-    status = "success" if return_code == 0 else "error"
+    status = "cancelled" if return_code == -2 else ("success" if return_code == 0 else "error")
     error_summary = _extract_error_summary(completed_stdout, completed_stderr)
     short_log = (
-        "Keine Änderungen erforderlich."
+        "Sync-Lauf wurde vom Benutzer abgebrochen."
+        if status == "cancelled"
+        else "Keine Änderungen erforderlich."
         if status == "success" and final_stats.files_transferred == 0 and final_stats.bytes_transferred == 0
         else (
             f"Sync erfolgreich: {final_stats.files_transferred} Dateien, {_format_bytes(final_stats.bytes_transferred)}, "

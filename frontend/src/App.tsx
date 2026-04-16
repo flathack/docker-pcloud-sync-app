@@ -241,6 +241,7 @@ export function App() {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [runLoading, setRunLoading] = useState(false);
   const [runActionId, setRunActionId] = useState<string | null>(null);
+  const [cancellingRunId, setCancellingRunId] = useState<string | null>(null);
   const [quickStartPairId, setQuickStartPairId] = useState<string>("");
   const [runLogLoading, setRunLogLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -701,6 +702,20 @@ export function App() {
     }
   }
 
+  async function handleCancelRun(runId: string, syncPairId: string) {
+    try {
+      setCancellingRunId(runId);
+      const response = await apiFetch(`/runs/${runId}/cancel`, { method: "POST" });
+      if (!response.ok) throw new Error(`Abbruch fehlgeschlagen mit Status ${response.status}`);
+      await loadDashboardData();
+      await loadRuns(syncPairId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setCancellingRunId(null);
+    }
+  }
+
   function toggleSyncPair(id: string) {
     setSelectedRunId(null);
     setSelectedSyncPairId((current) => current === id ? null : id);
@@ -1019,7 +1034,10 @@ export function App() {
                             <strong>{pair?.name ?? "Unbekanntes Sync-Paar"}</strong>
                             <p>{pair ? `${pair.source_path} → ${pair.destination_path}` : run.short_log}</p>
                           </div>
-                          <strong className="running-sync-percent">{percent !== null ? formatPercent(percent) : "Läuft"}</strong>
+                          <div className="running-sync-actions">
+                            <strong className="running-sync-percent">{percent !== null ? formatPercent(percent) : "Läuft"}</strong>
+                            <button className="table-button danger-inline" type="button" disabled={cancellingRunId === run.id} onClick={() => void handleCancelRun(run.id, run.sync_pair_id)}>{cancellingRunId === run.id ? "Wird abgebrochen..." : "Abbrechen"}</button>
+                          </div>
                         </div>
                         <div className="progress-bar-shell" aria-hidden="true">
                           <div className="progress-bar-fill" style={{ width: `${Math.max(4, percent ?? 6)}%` }} />
@@ -1146,6 +1164,7 @@ export function App() {
                                   <button className="table-button" type="button" onClick={() => handleEditSyncPair(pair)}>Bearbeiten</button>
                                   <button className="table-button" type="button" onClick={() => void handleToggleSyncPair(pair)}>{pair.enabled ? "Deaktivieren" : "Aktivieren"}</button>
                                   <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id || !pair.enabled} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Läuft..." : "Jetzt starten"}</button>
+                                  {pair.status === "running" && (() => { const activeRun = runs.find((r) => r.sync_pair_id === pair.id && r.status === "running") ?? recentRuns.find((r) => r.sync_pair_id === pair.id && r.status === "running"); return activeRun ? <button className="table-button danger-inline" type="button" disabled={cancellingRunId === activeRun.id} onClick={() => void handleCancelRun(activeRun.id, pair.id)}>{cancellingRunId === activeRun.id ? "Wird abgebrochen..." : "Abbrechen"}</button> : null; })()}
                                   <button className="table-button" type="button" onClick={() => void handleDeleteSyncPair(pair.id)}>Löschen</button>
                                 </div>
                               </div>
@@ -1206,7 +1225,10 @@ export function App() {
                                                         <p className="eyebrow">Live-Fortschritt</p>
                                                         <h3>Kopiervorgang läuft</h3>
                                                       </div>
-                                                      <strong>{formatPercent(percent)}</strong>
+                                                      <div className="running-sync-actions">
+                                                        <strong>{formatPercent(percent)}</strong>
+                                                        <button className="table-button danger-inline" type="button" disabled={cancellingRunId === run.id} onClick={() => void handleCancelRun(run.id, run.sync_pair_id)}>{cancellingRunId === run.id ? "Wird abgebrochen..." : "Abbrechen"}</button>
+                                                      </div>
                                                     </div>
                                                     <div className="progress-bar-shell" aria-hidden="true">
                                                       <div className="progress-bar-fill" style={{ width: `${Math.max(4, percent ?? 6)}%` }} />
