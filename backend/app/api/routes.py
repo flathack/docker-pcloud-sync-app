@@ -313,10 +313,7 @@ def cancel_run(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run nicht gefunden")
     if run.status != "running":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nur laufende Runs können abgebrochen werden")
-    try:
-        return sync_run_service.cancel_run(db, run)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return sync_run_service.cancel_run(db, run)
 
 
 @router.get("/settings/rclone/status", response_model=RcloneConfigStatus)

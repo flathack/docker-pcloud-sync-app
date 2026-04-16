@@ -548,24 +548,41 @@ def run_sync_pair(
         )
         assert process.stdout is not None
         cancelled = False
-        for raw_line in process.stdout:
+
+        def _read_stdout() -> None:
+            assert process.stdout is not None
+            for raw_line in process.stdout:
+                stdout_lines.append(raw_line)
+                message = _extract_message_from_line(raw_line)
+                _update_stats_from_message(stats, message)
+                nonlocal per_file_events
+                if FILE_EVENT_PATTERN.search(message) and "Transferred:" not in message:
+                    per_file_events += 1
+                    if stats.files_transferred == 0:
+                        stats.files_transferred = per_file_events
+                if progress_callback is not None and executable is not None:
+                    progress_callback(_progress_from_stats(stats, timestamp=utc_now()))
+
+        reader = threading.Thread(target=_read_stdout, daemon=True)
+        reader.start()
+
+        while reader.is_alive():
             if cancel_event is not None and cancel_event.is_set():
                 process.terminate()
                 try:
-                    process.wait(timeout=10)
+                    process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     process.kill()
+                    process.wait(timeout=5)
                 cancelled = True
+                reader.join(timeout=3)
                 break
-            stdout_lines.append(raw_line)
-            message = _extract_message_from_line(raw_line)
-            _update_stats_from_message(stats, message)
-            if FILE_EVENT_PATTERN.search(message) and "Transferred:" not in message:
-                per_file_events += 1
-                if stats.files_transferred == 0:
-                    stats.files_transferred = per_file_events
-            if progress_callback is not None and executable is not None:
-                progress_callback(_progress_from_stats(stats, timestamp=utc_now()))
+            reader.join(timeout=1)
+
+        if not cancelled and process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
+
         if cancelled:
             return_code = -2
             stderr_text = "Sync-Lauf wurde vom Benutzer abgebrochen."

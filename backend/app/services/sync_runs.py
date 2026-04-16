@@ -71,9 +71,29 @@ def read_run_log(run: SyncRun) -> str:
 def cancel_run(db: Session, run: SyncRun) -> SyncRun:
     with _progress_lock:
         cancel_event = _cancel_events.get(run.id)
-    if cancel_event is None:
-        raise ValueError("Dieser Lauf kann nicht abgebrochen werden.")
-    cancel_event.set()
+
+    if cancel_event is not None:
+        cancel_event.set()
+        return run
+
+    finished_at = utc_now()
+    sync_pair = db.get(SyncPair, run.sync_pair_id)
+
+    run.status = "cancelled"
+    run.finished_at = finished_at
+    run.duration_seconds = max(1, int((finished_at - run.started_at).total_seconds()))
+    run.short_log = "Sync-Lauf wurde vom Benutzer abgebrochen (Force-Cancel)."
+    run.report = "Der Lauf wurde manuell beendet. Es war kein aktiver Hintergrundprozess zugeordnet."
+    db.add(run)
+
+    if sync_pair is not None:
+        sync_pair.status = "idle"
+        sync_pair.last_status = "cancelled"
+        db.add(sync_pair)
+
+    db.commit()
+    db.refresh(run)
+    _mark_progress_finished(run.id, "cancelled", finished_at)
     return run
 
 

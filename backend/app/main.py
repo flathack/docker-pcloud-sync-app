@@ -163,4 +163,30 @@ def on_startup() -> None:
     ensure_dev_schema()
     seed_admin_user()
     seed_sync_pairs()
+    _cleanup_stale_running_state()
     start_scheduler()
+
+
+def _cleanup_stale_running_state() -> None:
+    db = SessionLocal()
+    try:
+        stale_runs = list(db.scalars(select(SyncRun).where(SyncRun.status == "running")))
+        for run in stale_runs:
+            run.status = "error"
+            run.short_log = "Sync-Lauf wurde durch Neustart des Servers abgebrochen."
+            run.report = "Der Lauf war beim Serverstart noch als 'running' markiert und wurde als fehlgeschlagen eingestuft."
+            run.finished_at = datetime.now(timezone.utc)
+            if run.started_at:
+                run.duration_seconds = max(1, int((run.finished_at - run.started_at).total_seconds()))
+            db.add(run)
+
+        stale_pairs = list(db.scalars(select(SyncPair).where(SyncPair.status == "running")))
+        for pair in stale_pairs:
+            pair.status = "idle"
+            pair.last_status = "error"
+            db.add(pair)
+
+        if stale_runs or stale_pairs:
+            db.commit()
+    finally:
+        db.close()
