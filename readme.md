@@ -821,3 +821,7 @@ npm run dev
 ## Klare Empfehlung
 
 Wenn das Ziel ein robustes, einfach wartbares System ist, dann ist fuer den Start die Kombination aus **FastAPI + React + SQLite + direkter rclone-Prozesssteuerung** die pragmatischste Loesung. Sie ist lokal schnell testbar, Docker-tauglich und kann spaeter ohne Architekturbruch in Richtung PostgreSQL, OIDC und Worker-Modell erweitert werden.
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
