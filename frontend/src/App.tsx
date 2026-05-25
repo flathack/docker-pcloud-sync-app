@@ -96,7 +96,7 @@ type RunLogResponse = { log: string };
 type UserAdminSummary = { username: string; role: string; is_active: boolean; created_at: string };
 type BrowserField = "source_path" | "destination_path" | null;
 type BrowserMode = "local" | "remote";
-type AppSection = "dashboard" | "sync-targets" | "users" | "settings";
+type AppSection = "dashboard" | "jobs" | "sync-targets" | "users" | "settings";
 type ThemeMode = "light" | "dark";
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
@@ -292,6 +292,10 @@ export function App() {
         .map((run) => [run.id, run]),
     ).values(),
   );
+  const upcomingJobs = syncPairs
+    .filter((pair) => pair.enabled && pair.schedule_enabled && pair.next_run_at)
+    .sort((a, b) => new Date(a.next_run_at ?? "").getTime() - new Date(b.next_run_at ?? "").getTime());
+  const jobRuns = [...chartRuns].sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
 
   async function checkSession() {
     try {
@@ -931,6 +935,7 @@ export function App() {
             </div>
             <nav className="sidebar-nav sidebar-card-nav">
               <button className={`sidebar-link ${activeSection === "dashboard" ? "active" : ""}`} type="button" onClick={() => setActiveSection("dashboard")}>Dashboard</button>
+              <button className={`sidebar-link ${activeSection === "jobs" ? "active" : ""}`} type="button" onClick={() => setActiveSection("jobs")}>Jobs</button>
               <button className={`sidebar-link ${activeSection === "sync-targets" ? "active" : ""}`} type="button" onClick={() => setActiveSection("sync-targets")}>Sync-Ziele</button>
               {currentUser.role === "admin" ? <button className={`sidebar-link ${activeSection === "users" ? "active" : ""}`} type="button" onClick={() => setActiveSection("users")}>Users</button> : null}
               <button className={`sidebar-link ${activeSection === "settings" ? "active" : ""}`} type="button" onClick={() => setActiveSection("settings")}>Settings</button>
@@ -1070,6 +1075,69 @@ export function App() {
             </section>
 
             {error ? <p className="state error">Fehler: {error}</p> : null}
+          </>
+        ) : activeSection === "jobs" ? (
+          <>
+            <section className="hero hero-rich">
+              <div>
+                <p className="eyebrow">Jobliste</p>
+                <h1>Gelaufene und zukuenftige Jobs</h1>
+                <p className="hero-copy">Eine eigene Uebersicht fuer geplante Sync-Laeufe, aktive Jobs und abgeschlossene Reports.</p>
+              </div>
+            </section>
+
+            <section className="jobs-grid">
+              <section className="panel job-panel">
+                <div className="panel-header">
+                  <div><p className="eyebrow">Zeitplan</p><h2>Zukuenftige Jobs</h2></div>
+                  <span className="badge muted">{upcomingJobs.length} geplant</span>
+                </div>
+                {upcomingJobs.length === 0 ? <p className="state">Aktuell sind keine zukuenftigen Jobs geplant.</p> : null}
+                <div className="job-list">
+                  {upcomingJobs.map((pair) => (
+                    <article className="job-card" key={pair.id}>
+                      <div>
+                        <strong>{pair.name}</strong>
+                        <p>{pair.source_path} -&gt; {pair.destination_path}</p>
+                      </div>
+                      <dl className="job-card-meta">
+                        <div><dt>Naechster Lauf</dt><dd>{formatDateTime(pair.next_run_at)}</dd></div>
+                        <div><dt>Zeitplan</dt><dd>{describeSchedule(pair)}</dd></div>
+                        <div><dt>Status</dt><dd><span className={`badge ${pair.status === "running" ? "running" : pair.last_status === "error" ? "error" : "idle"}`}>{pair.status === "running" ? "running" : pair.last_status}</span></dd></div>
+                      </dl>
+                      <button className="table-button primary-inline" type="button" disabled={runActionId === pair.id || !pair.enabled} onClick={() => void handleStartRun(pair.id)}>{runActionId === pair.id ? "Laeuft..." : "Jetzt starten"}</button>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="panel job-panel">
+                <div className="panel-header">
+                  <div><p className="eyebrow">Historie</p><h2>Gelaufene Jobs</h2></div>
+                  <span className="badge muted">{jobRuns.length} Reports</span>
+                </div>
+                {jobRuns.length === 0 ? <p className="state">Noch keine abgeschlossenen Jobs vorhanden.</p> : null}
+                <div className="job-list">
+                  {jobRuns.map((run) => {
+                    const pair = syncPairs.find((item) => item.id === run.sync_pair_id);
+                    return (
+                      <article className="job-card compact-job-card" key={run.id}>
+                        <div>
+                          <strong>{pair?.name ?? "Unbekanntes Sync-Paar"}</strong>
+                          <p>{formatDateTime(run.started_at)} - {run.status === "running" ? "laeuft noch" : formatDuration(run.duration_seconds)}</p>
+                        </div>
+                        <dl className="job-card-meta">
+                          <div><dt>Dateien</dt><dd>{run.files_transferred}</dd></div>
+                          <div><dt>Transfer</dt><dd>{formatBytes(run.bytes_transferred)}</dd></div>
+                          <div><dt>Fehler</dt><dd>{run.error_count}</dd></div>
+                          <div><dt>Status</dt><dd><span className={`badge ${run.status}`}>{run.status}</span></dd></div>
+                        </dl>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            </section>
           </>
         ) : activeSection === "sync-targets" ? (
           <>
