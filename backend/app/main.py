@@ -22,11 +22,18 @@ from app.services.sync_runs import start_sync_run
 app = FastAPI(title="SyncForge", version="0.1.0")
 _scheduler_started = False
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=os.getenv("APP_SECRET_KEY", "please-change-me"),
     same_site="lax",
-    https_only=False,
+    https_only=_env_flag("SESSION_COOKIE_SECURE"),
 )
 
 app.add_middleware(

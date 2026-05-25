@@ -9,6 +9,7 @@ services:
     environment:
       APP_ENV: production
       APP_SECRET_KEY: change-me
+      SESSION_COOKIE_SECURE: "false"
       DATABASE_URL: sqlite:////app/backend/data/app.db
       DEFAULT_TIMEZONE: Europe/Berlin
       FILE_BROWSER_ROOTS: /app/backend/data,/app/data/config,/mnt/nas

@@ -56,6 +56,35 @@ Vor dem Deploy in Portainer muessen dort mindestens diese Werte ersetzt werden:
 - `REPLACE_WITH_A_STRONG_PASSWORD`
 - `/volume1/YOUR_NAS_SHARE`
 
+Der Portainer-Stack bindet den Container-Port absichtlich an die Tailscale-IP
+`100.127.251.119`. Die App spricht im NAS-Stack direkt HTTPS mit dem
+Tailscale-Zertifikat fuer `alpha-nas.tail2b5c2.ts.net`.
+
+Das Zertifikat kann auf dem NAS in den gemounteten Zertifikatsordner geschrieben werden:
+
+```bash
+sudo mkdir -p /volume1/docker/syncforge/certs
+cd /volume1/docker/syncforge/certs
+sudo tailscale cert alpha-nas.tail2b5c2.ts.net
+```
+
+Der Portainer-Stack mountet diesen Ordner read-only nach `/app/certs` und setzt:
+
+```yaml
+SSL_CERTFILE: /app/certs/alpha-nas.tail2b5c2.ts.net.crt
+SSL_KEYFILE: /app/certs/alpha-nas.tail2b5c2.ts.net.key
+```
+
+Nach dem Redeploy ist die App ueber den Tailscale-Hostnamen erreichbar:
+
+```text
+https://alpha-nas.tail2b5c2.ts.net:8000/
+```
+
+Fuer diesen HTTPS-Betrieb ist im Portainer-Stack `SESSION_COOKIE_SECURE: "true"` gesetzt.
+Lokale HTTP-Setups koennen den Wert auf `"false"` lassen und `SSL_CERTFILE`/`SSL_KEYFILE`
+leer lassen.
+
 ### Empfohlener Update-Ablauf
 
 1. Repository nach GitHub pushen

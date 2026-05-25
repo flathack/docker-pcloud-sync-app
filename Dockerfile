@@ -33,6 +33,6 @@ RUN mkdir -p /app/backend/data /app/data/logs /app/data/config/rclone
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://localhost:8000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD if [ -n "$SSL_CERTFILE" ] && [ -n "$SSL_KEYFILE" ]; then curl -k -f https://localhost:8000/api/health; else curl -f http://localhost:8000/api/health; fi
 
-CMD ["uvicorn", "app.main:app", "--app-dir", "/app/backend", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "/app/backend/app/server.py"]
