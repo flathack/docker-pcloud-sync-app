@@ -1,0 +1,40 @@
+services:
+  syncforge:
+    # Public image published from the private source repository.
+    # Tag pin is recommended for production; :latest is fine for quick trials.
+    image: ghcr.io/flathack/docker-syncforge:latest
+    container_name: syncforge
+    ports:
+      # Adjust the host port to fit your setup. The default 8000 matches the
+      # container's internal listener.
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APP_ENV: production
+      SESSION_COOKIE_SECURE: "true"
+      DATABASE_URL: sqlite:////app/backend/data/app.db
+      DEFAULT_TIMEZONE: Europe/Berlin
+      FILE_BROWSER_ROOTS: /app/backend/data,/app/data/config,/mnt/nas
+      RCLONE_CONFIG: /app/data/config/rclone/rclone.conf
+      RCLONE_GLOBAL_FLAGS: --use-json-log --log-level INFO --stats 10s
+      TELEGRAM_ENABLED: "false"
+      TELEGRAM_BOT_TOKEN: ""
+      TELEGRAM_CHAT_ID: ""
+      TELEGRAM_NOTIFY_ON_SUCCESS: "false"
+      TELEGRAM_NOTIFY_ON_ERROR: "true"
+    volumes:
+      # Persistent state lives outside the container. Adjust the host paths to
+      # match your storage layout. The /mnt/nas mount is an example for the
+      # file-browser feature; remove it if you do not want NAS shares exposed.
+      - syncforge-data:/app/backend/data
+      - syncforge-logs:/app/data/logs
+      - syncforge-config:/app/data/config
+      # Example host bind mount for browsable shares:
+      # - /path/to/your/share:/mnt/nas:ro
+    restart: unless-stopped
+
+volumes:
+  syncforge-data:
+  syncforge-logs:
+  syncforge-config:
